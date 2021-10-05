@@ -1,0 +1,69 @@
+---
+title: "index"
+author: "Julien BARRERE"
+date: "5 octobre 2021"
+output: html_document
+---
+
+```{r setup, include = FALSE}
+knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
+```
+
+This R Markdown aims at testing the functioning of the `targets` package to produce R Markdown documents. 
+
+# Packages and set up
+
+We start by loading the required packages. `targets` must be version 0.5.0.9000 or above. 
+
+```{r, eval = FALSE}
+install.packages(c("dplyr", "ggplot2", "targets", "tidyr"))
+```
+
+Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
+
+```{r}
+library(targets)
+tar_unscript()
+```
+
+# Globals
+
+We define some global options/functions common to all targets, and load the functions located in the R directory of the repository. 
+
+```{targets example-globals, tar_globals = TRUE}
+options(tidyverse.quiet = TRUE)
+source("R/functions_data.R")
+tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr"))
+```
+
+# Targets
+
+First, let's extract the dead tree data for 2012 and 2013, to look at the data structure. We use the `read_ifn_data()` function.
+```{targets import-data}
+tar_target(data_imported, 
+           read_ifn_data(variable = "arbres_morts_foret", 
+                         path = "data/FrenchNFI", 
+                         years = c(2012, 2013),
+                         addyear = TRUE, 
+                         zipped = TRUE))
+```
+
+
+
+# Pipeline
+
+If you ran all the `{targets}` chunks in non-interactive mode, then your R scripts are set up to run the pipeline.
+
+```{r}
+tar_make()
+```
+
+# Output
+
+The `targets` dependency graph helps understanding the steps of the pipeline at a high level.
+
+```{r}
+tar_visnetwork()
+```
+
+
