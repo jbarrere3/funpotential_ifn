@@ -192,7 +192,9 @@ summary {
 <div id="packages-and-set-up" class="section level1">
 <h1>Packages and set up</h1>
 <p>We start by loading the required packages. <code>targets</code> must be version 0.5.0.9000 or above.</p>
-<pre class="r"><code>install.packages(c(&quot;dplyr&quot;, &quot;ggplot2&quot;, &quot;targets&quot;, &quot;tidyr&quot;))</code></pre>
+<pre class="r"><code>require(c(&quot;dplyr&quot;, &quot;ggplot2&quot;, &quot;targets&quot;, &quot;tidyr&quot;, 
+                            &quot;RColorBrewer&quot;, &quot;lme4&quot;, &quot;data.table&quot;, 
+                            &quot;knitr&quot;, &quot;stringr&quot;, &quot;measurements&quot;))</code></pre>
 <p>Second, we call the <code>targets</code> library. The <code>tar_unscript()</code> R function removes the <code>_targets_r</code> directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.</p>
 <pre class="r"><code>library(targets)
 tar_unscript()</code></pre>
@@ -202,34 +204,58 @@ tar_unscript()</code></pre>
 <p>We define some global options/functions common to all targets, and load the functions located in the R directory of the repository.</p>
 <pre class="r"><code>options(tidyverse.quiet = TRUE)
 source(&quot;R/functions_data.R&quot;)
-tar_option_set(packages = c(&quot;dplyr&quot;, &quot;ggplot2&quot;, &quot;targets&quot;, &quot;tidyr&quot;))
+tar_option_set(packages = c(&quot;dplyr&quot;, &quot;ggplot2&quot;, &quot;targets&quot;, &quot;tidyr&quot;, 
+                            &quot;RColorBrewer&quot;, &quot;lme4&quot;, &quot;data.table&quot;, 
+                            &quot;knitr&quot;, &quot;stringr&quot;, &quot;measurements&quot;))
 #&gt; Establish _targets.R and _targets_r/globals/example-globals.R.</code></pre>
 </div>
 <div id="targets" class="section level1">
 <h1>Targets</h1>
-<p>First, let’s extract the dead tree data for 2012 and 2013, to look at the data structure. We use the <code>read_ifn_data()</code> function.</p>
-<pre class="r"><code>tar_target(data_imported, 
-           read_ifn_data(variable = &quot;arbres_morts_foret&quot;, 
-                         path = &quot;data/FrenchNFI&quot;, 
-                         years = c(2012, 2013),
-                         addyear = TRUE, 
-                         zipped = TRUE))
-#&gt; Establish _targets.R and _targets_r/targets/import-data.R.</code></pre>
+<div id="data-importation" class="section level2">
+<h2>Data importation</h2>
+<div id="nfi-data" class="section level3">
+<h3>NFI data</h3>
+<p>We start by importing the following data on:</p>
+<ul>
+<li>NFI plots (<code>NFI_plot</code>)</li>
+<li>NFI individual trees (<code>NFI_tree</code>)</li>
+<li>NFI plots remeasured (<code>NFI_plot_remeasure</code>)</li>
+<li>Individual trees remeasured that were either alive (<code>NFI_tree_alive_remeasure</code>) or dead (<code>NFI_tree_dead_remeasure</code>) at first measurement.</li>
+</ul>
+<pre class="r"><code>tar_target(NFI_plot, read_plot(path = &quot;data/FrenchNFI&quot;))
+#&gt; Establish _targets.R and _targets_r/targets/import-NFI_plot.R.</code></pre>
+<pre class="r"><code>tar_target(NFI_tree, read_tree(path = &quot;data/FrenchNFI&quot;))
+#&gt; Establish _targets.R and _targets_r/targets/import-NFI_tree.R.</code></pre>
+<pre class="r"><code>tar_target(NFI_plot_remeasure, read_reameasure_plot(path = &quot;data/FrenchNFI_remeasure&quot;))
+#&gt; Establish _targets.R and _targets_r/targets/import-plot_remeasure.R.</code></pre>
+<pre class="r"><code>tar_target(NFI_tree_alive_remeasure, read.csv(&quot;data/donnees_arbres_retour/foret_c135.csv&quot;, sep = &quot;;&quot;))
+#&gt; Establish _targets.R and _targets_r/targets/import-tree_alive_remeasure.R.</code></pre>
+<pre class="r"><code>tar_target(NFI_tree_dead_remeasure, read.csv(&quot;data/donnees_arbres_retour/foret_morts.csv&quot;, sep = &quot;;&quot;))
+#&gt; Establish _targets.R and _targets_r/targets/import-tree_dead_remeasure.R.</code></pre>
+<p>Second, we merge the remeasures of previously dead and alive trees with the <code>NFI_tree</code> dataset, to obtain <code>NFI_tree_join</code>.</p>
+<pre class="r"><code>tar_target(NFI_tree_join, merge_NFI(NFI_tree, NFI_tree_alive_remeasure, NFI_tree_dead_remeasure))
+#&gt; Establish _targets.R and _targets_r/targets/NFI_tree_join.R.</code></pre>
+</div>
+</div>
 </div>
 <div id="pipeline" class="section level1">
 <h1>Pipeline</h1>
 <p>If you ran all the <code>{targets}</code> chunks in non-interactive mode, then your R scripts are set up to run the pipeline.</p>
 <pre class="r"><code>tar_make()
-#&gt; * start target data_imported
-#&gt; * built target data_imported
-#&gt; * end pipeline</code></pre>
+#&gt; v skip target NFI_plot_remeasure
+#&gt; v skip target NFI_tree_alive_remeasure
+#&gt; v skip target NFI_tree
+#&gt; v skip target NFI_tree_dead_remeasure
+#&gt; v skip target NFI_plot
+#&gt; v skip target NFI_tree_join
+#&gt; v skip pipeline</code></pre>
 </div>
 <div id="output" class="section level1">
 <h1>Output</h1>
 <p>The <code>targets</code> dependency graph helps understanding the steps of the pipeline at a high level.</p>
 <pre class="r"><code>tar_visnetwork()</code></pre>
-<div id="htmlwidget-abc6b0b8ebf36bff840a" style="width:672px;height:480px;" class="visNetwork html-widget"></div>
-<script type="application/json" data-for="htmlwidget-abc6b0b8ebf36bff840a">{"x":{"nodes":{"name":["data_imported","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"type":["stem","function","function","function","function","function","function","function","function","function","function","function","function"],"status":["uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate"],"seconds":[0.37,null,null,null,null,null,null,null,null,null,null,null,null],"bytes":[91285,null,null,null,null,null,null,null,null,null,null,null,null],"branches":[null,null,null,null,null,null,null,null,null,null,null,null,null],"id":["data_imported","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"label":["data_imported","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"level":[2,1,0,0,1,0,2,2,2,2,2,2,2],"color":["#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823"],"shape":["dot","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle"]},"edges":{"from":["read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_remeasure_data","read_ifn_data"],"to":["read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot","data_imported"],"arrows":["to","to","to","to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Up to date","Stem","Function"],"color":["#354823","#899DA4","#899DA4"],"shape":["dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-b2f1d4f5428e474958bb" style="width:672px;height:480px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-b2f1d4f5428e474958bb">{"x":{"nodes":{"name":["NFI_plot","NFI_plot_remeasure","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","NFI_tree_join","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"type":["stem","stem","stem","stem","stem","stem","function","function","function","function","function","function","function","function","function","function","function","function"],"status":["uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate"],"seconds":[0.54,1.36,7.91,0.36,1.33,0.61,null,null,null,null,null,null,null,null,null,null,null,null],"bytes":[1242044,143438,11484361,904870,65138,12269792,null,null,null,null,null,null,null,null,null,null,null,null],"branches":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"id":["NFI_plot","NFI_plot_remeasure","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","NFI_tree_join","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"label":["NFI_plot","NFI_plot_remeasure","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","NFI_tree_join","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"level":[3,3,3,1,1,4,1,0,0,1,1,2,2,2,2,2,2,2],"color":["#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823"],"shape":["dot","dot","dot","dot","dot","dot","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle"]},"edges":{"from":["read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_remeasure_data","read_reameasure_plot","merge_NFI","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","read_tree","read_plot"],"to":["read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot","NFI_plot_remeasure","NFI_tree_join","NFI_tree_join","NFI_tree_join","NFI_tree_join","NFI_tree","NFI_plot"],"arrows":["to","to","to","to","to","to","to","to","to","to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Up to date","Stem","Function"],"color":["#354823","#899DA4","#899DA4"],"shape":["dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
 </div>
 
 

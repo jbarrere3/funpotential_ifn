@@ -109,7 +109,7 @@ read_ifn_remeasure_data <- function(variable, path, years,
 #' @param years Vector with years for which data are to be read; defaults
 #' are 2008 to 2013
 #' @return a data.table object
-read_plot <- function(path = "data", years = 2008:2014) {
+read_plot <- function(path = "data", years = 2008:2019) {
   read_ifn_data("placettes_foret", path, years,
                 
                 # colClasses currently ignored. Currently specified in format
@@ -128,7 +128,7 @@ read_plot <- function(path = "data", years = 2008:2014) {
 #' @export
 #' @inheritParams read_plot
 #' @return a data.table object
-read_tree <- function(path = "data", years = 2008:2014) {
+read_tree <- function(path = "data", years = 2008:2019) {
   read_ifn_data("arbres_foret", path, years)
 }
 
@@ -139,7 +139,7 @@ read_tree <- function(path = "data", years = 2008:2014) {
 #' @export
 #' @inheritParams read_plot
 #' @return a data.table object
-read_couv <- function(path = "data", years = 2008:2014) {
+read_couv <- function(path = "data", years = 2008:2019) {
   read_ifn_data("couverts_foret", path, years)
 }
 
@@ -150,7 +150,7 @@ read_couv <- function(path = "data", years = 2008:2014) {
 #' @export
 #' @inheritParams read_plot
 #' @return a data.table object
-read_dead_tree <- function(path = "data", years = 2008:2014) {
+read_dead_tree <- function(path = "data", years = 2008:2019) {
   read_ifn_data("arbres_morts_foret", path, years)
 }
 
@@ -161,7 +161,7 @@ read_dead_tree <- function(path = "data", years = 2008:2014) {
 #' @export
 #' @inheritParams read_plot
 #' @return a data.table object
-read_doc <- function(path = "data", years = 2008:2014) {
+read_doc <- function(path = "data", years = 2008:2019) {
   data_doc <- read_ifn_data("documentation", path, years)
   data_doc$code <- ifelse(data_doc$code=="2,50E+04", "25E3", data_doc$code)
   data_doc$code <- ifelse(data_doc$code=="2,50E+4", "25E3", data_doc$code)
@@ -178,7 +178,7 @@ read_doc <- function(path = "data", years = 2008:2014) {
 #' @export
 #' @inheritParams read_plot
 #' @return a data.table object
-read_ecological_data <- function(path = "data", years = 2008:2014) {
+read_ecological_data <- function(path = "data", years = 2008:2019) {
   read_ifn_data("ecologie", path, years)
 }
 

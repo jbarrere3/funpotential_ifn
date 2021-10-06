@@ -16,7 +16,9 @@ This R Markdown aims at testing the functioning of the `targets` package to prod
 We start by loading the required packages. `targets` must be version 0.5.0.9000 or above. 
 
 ```{r, eval = FALSE}
-install.packages(c("dplyr", "ggplot2", "targets", "tidyr"))
+require(c("dplyr", "ggplot2", "targets", "tidyr", 
+                            "RColorBrewer", "lme4", "data.table", 
+                            "knitr", "stringr", "measurements"))
 ```
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
@@ -33,22 +35,50 @@ We define some global options/functions common to all targets, and load the func
 ```{targets example-globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
-tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr"))
+tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr", 
+                            "RColorBrewer", "lme4", "data.table", 
+                            "knitr", "stringr", "measurements"))
 ```
 
 # Targets
 
-First, let's extract the dead tree data for 2012 and 2013, to look at the data structure. We use the `read_ifn_data()` function.
-```{targets import-data}
-tar_target(data_imported, 
-           read_ifn_data(variable = "arbres_morts_foret", 
-                         path = "data/FrenchNFI", 
-                         years = c(2012, 2013),
-                         addyear = TRUE, 
-                         zipped = TRUE))
+## Data importation
+
+### NFI data
+
+We start by importing the following data on: 
+
+- NFI plots (`NFI_plot`) 
+- NFI individual trees (`NFI_tree`) 
+- NFI plots remeasured (`NFI_plot_remeasure`) 
+- Individual trees remeasured that were either alive  (`NFI_tree_alive_remeasure`) or dead (`NFI_tree_dead_remeasure`) at first measurement. 
+
+```{targets import-NFI_plot}
+tar_target(NFI_plot, read_plot(path = "data/FrenchNFI"))
+```
+
+```{targets import-NFI_tree}
+tar_target(NFI_tree, read_tree(path = "data/FrenchNFI"))
+```
+
+```{targets import-plot_remeasure}
+tar_target(NFI_plot_remeasure, read_reameasure_plot(path = "data/FrenchNFI_remeasure"))
+```
+
+```{targets import-tree_alive_remeasure}
+tar_target(NFI_tree_alive_remeasure, read.csv("data/donnees_arbres_retour/foret_c135.csv", sep = ";"))
+```
+
+```{targets import-tree_dead_remeasure}
+tar_target(NFI_tree_dead_remeasure, read.csv("data/donnees_arbres_retour/foret_morts.csv", sep = ";"))
 ```
 
 
+Second, we merge the remeasures of previously dead and alive trees with the `NFI_tree` dataset, to obtain `NFI_tree_join`.
+
+```{targets NFI_tree_join}
+tar_target(NFI_tree_join, merge_NFI(NFI_tree, NFI_tree_alive_remeasure, NFI_tree_dead_remeasure))
+```
 
 # Pipeline
 
