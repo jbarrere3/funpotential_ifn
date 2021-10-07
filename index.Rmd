@@ -49,36 +49,82 @@ tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
 We start by importing the following data on: 
 
 - NFI plots (`NFI_plot`) 
-- NFI individual trees (`NFI_tree`) 
+- NFI individual trees that were either alive (`NFI_tree_alive`) or dead (`NFI_tree_dead`) 
 - NFI plots remeasured (`NFI_plot_remeasure`) 
 - Individual trees remeasured that were either alive  (`NFI_tree_alive_remeasure`) or dead (`NFI_tree_dead_remeasure`) at first measurement. 
 
-```{targets import-NFI_plot}
-tar_target(NFI_plot, read_plot(path = "data/FrenchNFI"))
+```{targets import-NFI-data}
+list(
+  tar_target(NFI_plot, read_plot(path = "data/FrenchNFI")), 
+  tar_target(NFI_tree_alive, read_tree(path = "data/FrenchNFI")), 
+  tar_target(NFI_tree_dead, read_dead_tree(path = "data/FrenchNFI")), 
+  tar_target(NFI_plot_remeasure, read_reameasure_plot(path = "data/FrenchNFI_remeasure")), 
+  tar_target(NFI_tree_alive_remeasure, read.csv("data/donnees_arbres_retour/foret_c135.csv", sep = ";")), 
+  tar_target(NFI_tree_dead_remeasure, read.csv("data/donnees_arbres_retour/foret_morts.csv", sep = ";"))
+)
+
 ```
 
-```{targets import-NFI_tree}
-tar_target(NFI_tree, read_tree(path = "data/FrenchNFI"))
-```
+Second, we merge : 
 
-```{targets import-plot_remeasure}
-tar_target(NFI_plot_remeasure, read_reameasure_plot(path = "data/FrenchNFI_remeasure"))
-```
-
-```{targets import-tree_alive_remeasure}
-tar_target(NFI_tree_alive_remeasure, read.csv("data/donnees_arbres_retour/foret_c135.csv", sep = ";"))
-```
-
-```{targets import-tree_dead_remeasure}
-tar_target(NFI_tree_dead_remeasure, read.csv("data/donnees_arbres_retour/foret_morts.csv", sep = ";"))
-```
-
-
-Second, we merge the remeasures of previously dead and alive trees with the `NFI_tree` dataset, to obtain `NFI_tree_join`.
+* the data on alive and dead trees to obtain `NFI_tree`
+* the remeasures of previously alive and dead trees to obtain `NFI_tree_remeasured`.
 
 ```{targets NFI_tree_join}
-tar_target(NFI_tree_join, merge_NFI(NFI_tree, NFI_tree_alive_remeasure, NFI_tree_dead_remeasure))
+list(
+  tar_target(NFI_tree, merge_dead_alive(NFI_tree_alive, NFI_tree_dead)),
+  tar_target(NFI_tree_remeasured, 
+             merge_NFI_remeasured(NFI_tree_alive_remeasure, NFI_tree_dead_remeasure))
+)
 ```
+
+## Data formating - TreeMort project
+
+### Species data
+
+We start by importing :
+
+* The existing species table in the NFI directory (`NFI_species`).
+* A correspondence table linking genus and families. This table was built from the NCBI Taxonomy database ([Federhen 2012](https://doi.org/10.1093/nar/gkr1178)).
+
+```{targets import-species-NFI}
+list(
+  tar_target(NFI_species, read.csv("data/FrenchNFI/species.csv", sep = ",")), 
+  tar_target(NFI_genus_species_correspondence, read.csv("data/TreeMort/correspondanceGenusFamilyNFI.csv", sep = ";"))
+)
+```
+
+Using these two tables, we create a species table that matches TreeMort template (`TreeMort_species`), and write this table in the TreeMort directory. 
+
+```{targets format-species-NFI-to-TreeMort}
+tar_target(TreeMort_species, Format_species_TreeMort(NFI_species, NFI_genus_species_correspondence))
+```
+
+```{r}
+write.table(tar_read(TreeMort_species), 
+          file = "data/TreeMort/spp_data.csv", row.names = F)
+```
+
+
+
+### Trees data
+
+We start by formatting the table of the first (census 1) and second (census 2) measurements (both dead and alive trees).
+
+```{targets format-trees-NFI-to-TreeMort-by-census}
+list(
+  tar_target(TreeMort_tree_census1, Format_trees_census1_TreeMort(NFI_tree, TreeMort_species)),
+  tar_target(TreeMort_tree_census2, Format_trees_census2_TreeMort(NFI_tree_remeasured, TreeMort_tree_census1))
+)
+```
+
+And we merge these two dataframes to obtain the complete tree NFI dataset formatted for TreeMort. 
+
+```{targets format-trees-NFI-to-TreeMort}
+tar_target(TreeMort_tree, rbind(TreeMort_tree_census1, TreeMort_tree_census2))
+```
+
+
 
 # Pipeline
 

@@ -218,23 +218,64 @@ tar_option_set(packages = c(&quot;dplyr&quot;, &quot;ggplot2&quot;, &quot;target
 <p>We start by importing the following data on:</p>
 <ul>
 <li>NFI plots (<code>NFI_plot</code>)</li>
-<li>NFI individual trees (<code>NFI_tree</code>)</li>
+<li>NFI individual trees that were either alive (<code>NFI_tree_alive</code>) or dead (<code>NFI_tree_dead</code>)</li>
 <li>NFI plots remeasured (<code>NFI_plot_remeasure</code>)</li>
 <li>Individual trees remeasured that were either alive (<code>NFI_tree_alive_remeasure</code>) or dead (<code>NFI_tree_dead_remeasure</code>) at first measurement.</li>
 </ul>
-<pre class="r"><code>tar_target(NFI_plot, read_plot(path = &quot;data/FrenchNFI&quot;))
-#&gt; Establish _targets.R and _targets_r/targets/import-NFI_plot.R.</code></pre>
-<pre class="r"><code>tar_target(NFI_tree, read_tree(path = &quot;data/FrenchNFI&quot;))
-#&gt; Establish _targets.R and _targets_r/targets/import-NFI_tree.R.</code></pre>
-<pre class="r"><code>tar_target(NFI_plot_remeasure, read_reameasure_plot(path = &quot;data/FrenchNFI_remeasure&quot;))
-#&gt; Establish _targets.R and _targets_r/targets/import-plot_remeasure.R.</code></pre>
-<pre class="r"><code>tar_target(NFI_tree_alive_remeasure, read.csv(&quot;data/donnees_arbres_retour/foret_c135.csv&quot;, sep = &quot;;&quot;))
-#&gt; Establish _targets.R and _targets_r/targets/import-tree_alive_remeasure.R.</code></pre>
-<pre class="r"><code>tar_target(NFI_tree_dead_remeasure, read.csv(&quot;data/donnees_arbres_retour/foret_morts.csv&quot;, sep = &quot;;&quot;))
-#&gt; Establish _targets.R and _targets_r/targets/import-tree_dead_remeasure.R.</code></pre>
-<p>Second, we merge the remeasures of previously dead and alive trees with the <code>NFI_tree</code> dataset, to obtain <code>NFI_tree_join</code>.</p>
-<pre class="r"><code>tar_target(NFI_tree_join, merge_NFI(NFI_tree, NFI_tree_alive_remeasure, NFI_tree_dead_remeasure))
+<pre class="r"><code>list(
+  tar_target(NFI_plot, read_plot(path = &quot;data/FrenchNFI&quot;)), 
+  tar_target(NFI_tree_alive, read_tree(path = &quot;data/FrenchNFI&quot;)), 
+  tar_target(NFI_tree_dead, read_dead_tree(path = &quot;data/FrenchNFI&quot;)), 
+  tar_target(NFI_plot_remeasure, read_reameasure_plot(path = &quot;data/FrenchNFI_remeasure&quot;)), 
+  tar_target(NFI_tree_alive_remeasure, read.csv(&quot;data/donnees_arbres_retour/foret_c135.csv&quot;, sep = &quot;;&quot;)), 
+  tar_target(NFI_tree_dead_remeasure, read.csv(&quot;data/donnees_arbres_retour/foret_morts.csv&quot;, sep = &quot;;&quot;))
+)
+
+#&gt; Establish _targets.R and _targets_r/targets/import-NFI-data.R.</code></pre>
+<p>Second, we merge :</p>
+<ul>
+<li>the data on alive and dead trees to obtain <code>NFI_tree</code></li>
+<li>the remeasures of previously alive and dead trees to obtain <code>NFI_tree_remeasured</code>.</li>
+</ul>
+<pre class="r"><code>list(
+  tar_target(NFI_tree, merge_dead_alive(NFI_tree_alive, NFI_tree_dead)),
+  tar_target(NFI_tree_remeasured, 
+             merge_NFI_remeasured(NFI_tree_alive_remeasure, NFI_tree_dead_remeasure))
+)
 #&gt; Establish _targets.R and _targets_r/targets/NFI_tree_join.R.</code></pre>
+</div>
+</div>
+<div id="data-formating---treemort-project" class="section level2">
+<h2>Data formating - TreeMort project</h2>
+<div id="species-data" class="section level3">
+<h3>Species data</h3>
+<p>We start by importing :</p>
+<ul>
+<li>The existing species table in the NFI directory (<code>NFI_species</code>).</li>
+<li>A correspondence table linking genus and families. This table was built from the NCBI Taxonomy database (<a href="https://doi.org/10.1093/nar/gkr1178">Federhen 2012</a>).</li>
+</ul>
+<pre class="r"><code>list(
+  tar_target(NFI_species, read.csv(&quot;data/FrenchNFI/species.csv&quot;, sep = &quot;,&quot;)), 
+  tar_target(NFI_genus_species_correspondence, read.csv(&quot;data/TreeMort/correspondanceGenusFamilyNFI.csv&quot;, sep = &quot;;&quot;))
+)
+#&gt; Establish _targets.R and _targets_r/targets/import-species-NFI.R.</code></pre>
+<p>Using these two tables, we create a species table that matches TreeMort template (<code>TreeMort_species</code>), and write this table in the TreeMort directory.</p>
+<pre class="r"><code>tar_target(TreeMort_species, Format_species_TreeMort(NFI_species, NFI_genus_species_correspondence))
+#&gt; Establish _targets.R and _targets_r/targets/format-species-NFI-to-TreeMort.R.</code></pre>
+<pre class="r"><code>write.table(tar_read(TreeMort_species), 
+          file = &quot;data/TreeMort/spp_data.csv&quot;, row.names = F)</code></pre>
+</div>
+<div id="trees-data" class="section level3">
+<h3>Trees data</h3>
+<p>We start by formatting the table of the first (census 1) and second (census 2) measurements (both dead and alive trees).</p>
+<pre class="r"><code>list(
+  tar_target(TreeMort_tree_census1, Format_trees_census1_TreeMort(NFI_tree, TreeMort_species)),
+  tar_target(TreeMort_tree_census2, Format_trees_census2_TreeMort(NFI_tree_remeasured, TreeMort_tree_census1))
+)
+#&gt; Establish _targets.R and _targets_r/targets/format-trees-NFI-to-TreeMort-by-census.R.</code></pre>
+<p>And we merge these two dataframes to obtain the complete tree NFI dataset formatted for TreeMort.</p>
+<pre class="r"><code>tar_target(TreeMort_tree, rbind(TreeMort_tree_census1, TreeMort_tree_census2))
+#&gt; Establish _targets.R and _targets_r/targets/format-trees-NFI-to-TreeMort.R.</code></pre>
 </div>
 </div>
 </div>
@@ -243,19 +284,28 @@ tar_option_set(packages = c(&quot;dplyr&quot;, &quot;ggplot2&quot;, &quot;target
 <p>If you ran all the <code>{targets}</code> chunks in non-interactive mode, then your R scripts are set up to run the pipeline.</p>
 <pre class="r"><code>tar_make()
 #&gt; v skip target NFI_plot_remeasure
+#&gt; v skip target NFI_tree_dead
 #&gt; v skip target NFI_tree_alive_remeasure
-#&gt; v skip target NFI_tree
+#&gt; v skip target NFI_species
+#&gt; v skip target NFI_tree_alive
 #&gt; v skip target NFI_tree_dead_remeasure
+#&gt; v skip target NFI_genus_species_correspondence
 #&gt; v skip target NFI_plot
-#&gt; v skip target NFI_tree_join
-#&gt; v skip pipeline</code></pre>
+#&gt; v skip target NFI_tree
+#&gt; v skip target NFI_tree_remeasured
+#&gt; v skip target TreeMort_species
+#&gt; v skip target TreeMort_tree_census1
+#&gt; v skip target TreeMort_tree_census2
+#&gt; * start target TreeMort_tree
+#&gt; * built target TreeMort_tree
+#&gt; * end pipeline</code></pre>
 </div>
 <div id="output" class="section level1">
 <h1>Output</h1>
 <p>The <code>targets</code> dependency graph helps understanding the steps of the pipeline at a high level.</p>
 <pre class="r"><code>tar_visnetwork()</code></pre>
-<div id="htmlwidget-b2f1d4f5428e474958bb" style="width:672px;height:480px;" class="visNetwork html-widget"></div>
-<script type="application/json" data-for="htmlwidget-b2f1d4f5428e474958bb">{"x":{"nodes":{"name":["NFI_plot","NFI_plot_remeasure","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","NFI_tree_join","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"type":["stem","stem","stem","stem","stem","stem","function","function","function","function","function","function","function","function","function","function","function","function"],"status":["uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate"],"seconds":[0.54,1.36,7.91,0.36,1.33,0.61,null,null,null,null,null,null,null,null,null,null,null,null],"bytes":[1242044,143438,11484361,904870,65138,12269792,null,null,null,null,null,null,null,null,null,null,null,null],"branches":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"id":["NFI_plot","NFI_plot_remeasure","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","NFI_tree_join","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"label":["NFI_plot","NFI_plot_remeasure","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","NFI_tree_join","read_ifn_data","map_plot","merge_dead_alive","read_ifn_remeasure_data","merge_NFI","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"level":[3,3,3,1,1,4,1,0,0,1,1,2,2,2,2,2,2,2],"color":["#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823"],"shape":["dot","dot","dot","dot","dot","dot","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle"]},"edges":{"from":["read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_remeasure_data","read_reameasure_plot","merge_NFI","NFI_tree","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","read_tree","read_plot"],"to":["read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot","NFI_plot_remeasure","NFI_tree_join","NFI_tree_join","NFI_tree_join","NFI_tree_join","NFI_tree","NFI_plot"],"arrows":["to","to","to","to","to","to","to","to","to","to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Up to date","Stem","Function"],"color":["#354823","#899DA4","#899DA4"],"shape":["dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
+<div id="htmlwidget-6a1d43e8d40c11d1874c" style="width:672px;height:480px;" class="visNetwork html-widget"></div>
+<script type="application/json" data-for="htmlwidget-6a1d43e8d40c11d1874c">{"x":{"nodes":{"name":["NFI_genus_species_correspondence","NFI_plot","NFI_plot_remeasure","NFI_species","NFI_tree","NFI_tree_alive","NFI_tree_alive_remeasure","NFI_tree_dead","NFI_tree_dead_remeasure","NFI_tree_remeasured","TreeMort_species","TreeMort_tree","TreeMort_tree_census1","TreeMort_tree_census2","read_ifn_data","map_plot","Format_species_TreeMort","merge_dead_alive","merge_NFI_remeasured","read_ifn_remeasure_data","Format_trees_census2_TreeMort","merge_NFI_alive","Format_trees_census1_TreeMort","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"type":["stem","stem","stem","stem","stem","stem","stem","stem","stem","stem","stem","stem","stem","stem","function","function","function","function","function","function","function","function","function","function","function","function","function","function","function","function"],"status":["uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate","uptodate"],"seconds":[1.19,0.54,1.36,1.62,0.18,7.74,0.36,1.6,1.33,1.31,1.15,2.52,10.66,3.7,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"bytes":[930,1242044,143438,5374,12076629,11484361,904870,554501,65138,1023436,2657,19223789,15519333,3565457,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"branches":[null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null,null],"id":["NFI_genus_species_correspondence","NFI_plot","NFI_plot_remeasure","NFI_species","NFI_tree","NFI_tree_alive","NFI_tree_alive_remeasure","NFI_tree_dead","NFI_tree_dead_remeasure","NFI_tree_remeasured","TreeMort_species","TreeMort_tree","TreeMort_tree_census1","TreeMort_tree_census2","read_ifn_data","map_plot","Format_species_TreeMort","merge_dead_alive","merge_NFI_remeasured","read_ifn_remeasure_data","Format_trees_census2_TreeMort","merge_NFI_alive","Format_trees_census1_TreeMort","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"label":["NFI_genus_species_correspondence","NFI_plot","NFI_plot_remeasure","NFI_species","NFI_tree","NFI_tree_alive","NFI_tree_alive_remeasure","NFI_tree_dead","NFI_tree_dead_remeasure","NFI_tree_remeasured","TreeMort_species","TreeMort_tree","TreeMort_tree_census1","TreeMort_tree_census2","read_ifn_data","map_plot","Format_species_TreeMort","merge_dead_alive","merge_NFI_remeasured","read_ifn_remeasure_data","Format_trees_census2_TreeMort","merge_NFI_alive","Format_trees_census1_TreeMort","read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot"],"level":[1,3,3,1,4,3,1,3,1,2,2,7,5,6,1,0,1,1,1,1,1,0,1,2,2,2,2,2,2,2],"color":["#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823","#354823"],"shape":["dot","dot","dot","dot","dot","dot","dot","dot","dot","dot","dot","dot","dot","dot","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle","triangle"]},"edges":{"from":["read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_data","read_ifn_remeasure_data","read_reameasure_plot","read_dead_tree","read_tree","Format_trees_census1_TreeMort","NFI_tree","TreeMort_species","Format_trees_census2_TreeMort","NFI_tree_remeasured","TreeMort_tree_census1","merge_dead_alive","NFI_tree_alive","NFI_tree_dead","Format_species_TreeMort","NFI_genus_species_correspondence","NFI_species","read_plot","merge_NFI_remeasured","NFI_tree_alive_remeasure","NFI_tree_dead_remeasure","TreeMort_tree_census1","TreeMort_tree_census2"],"to":["read_tree","read_couv","read_ecological_data","read_dead_tree","read_plot","read_doc","read_reameasure_plot","NFI_plot_remeasure","NFI_tree_dead","NFI_tree_alive","TreeMort_tree_census1","TreeMort_tree_census1","TreeMort_tree_census1","TreeMort_tree_census2","TreeMort_tree_census2","TreeMort_tree_census2","NFI_tree","NFI_tree","NFI_tree","TreeMort_species","TreeMort_species","TreeMort_species","NFI_plot","NFI_tree_remeasured","NFI_tree_remeasured","NFI_tree_remeasured","TreeMort_tree","TreeMort_tree"],"arrows":["to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to","to"]},"nodesToDataframe":true,"edgesToDataframe":true,"options":{"width":"100%","height":"100%","nodes":{"shape":"dot","physics":false},"manipulation":{"enabled":false},"edges":{"smooth":{"type":"cubicBezier","forceDirection":"horizontal"}},"physics":{"stabilization":false},"layout":{"hierarchical":{"enabled":true,"direction":"LR"}}},"groups":null,"width":null,"height":null,"idselection":{"enabled":false,"style":"width: 150px; height: 26px","useLabels":true,"main":"Select by id"},"byselection":{"enabled":false,"style":"width: 150px; height: 26px","multiple":false,"hideColor":"rgba(200,200,200,0.5)","highlight":false},"main":{"text":"","style":"font-family:Georgia, Times New Roman, Times, serif;font-weight:bold;font-size:20px;text-align:center;"},"submain":null,"footer":null,"background":"rgba(0, 0, 0, 0)","highlight":{"enabled":true,"hoverNearest":false,"degree":{"from":1,"to":1},"algorithm":"hierarchical","hideColor":"rgba(200,200,200,0.5)","labelOnly":true},"collapse":{"enabled":true,"fit":false,"resetHighlight":true,"clusterOptions":null,"keepCoord":true,"labelSuffix":"(cluster)"},"legend":{"width":0.2,"useGroups":false,"position":"right","ncol":1,"stepX":100,"stepY":100,"zoom":true,"nodes":{"label":["Up to date","Stem","Function"],"color":["#354823","#899DA4","#899DA4"],"shape":["dot","dot","triangle"]},"nodesToDataframe":true}},"evals":[],"jsHooks":[]}</script>
 </div>
 
 

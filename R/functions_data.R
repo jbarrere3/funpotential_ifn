@@ -15,7 +15,7 @@
 
 #### Section 1 - Read French NFI ####
 #' @description Group of functions used to read French NFI data
-#' @author Georges Kunstler (INRAE - LESSEM)
+#' @authors Georges Kunstler - Patrick Vallet - Björn Reineking (INRAE - LESSEM)
 
 #' Read IFN data for each year
 #'
@@ -228,18 +228,113 @@ map_plot <- function(data_plot) {
 
 
 
-# Merge NFI data
+# Merge NFI data for trees alive at first measurement
 #' @details function imported from the scrip "Merge_NFI_data.R", unlike the other 
 #           functions of this first section that were imported from 'READ_FRENCH_NFI.R'
 
-merge_NFI <- function(NFI_tree, NFI_tree_alive_remeasure, NFI_tree_dead_remeasure){
+merge_NFI_alive <- function(NFI_tree, NFI_tree_alive_remeasure){
   
   # NFI_tree_alive_remeasure that were alive at first measurement
   # NFI_tree_dead_remeasure that were dead at first measurement
-  NFI_tree_dead_remeasure$c135 <- NA
-  NFI_tree_remeasure <- rbind(NFI_tree_alive_remeasure, NFI_tree_dead_remeasure)
   library(dplyr)
-  NFI_tree_j <- left_join(NFI_tree, NFI_tree_remeasure , 
+  NFI_tree_j <- left_join(NFI_tree, NFI_tree_alive_remeasure, 
                           by = c("idp" = "idp", "a" = "a"))
   return(NFI_tree_j)
+}
+
+#' Merge NFI remeasured dead and alive trees
+#' @details Function that merges the two tables of remeasured trees (dead and alive) 
+#' @param NFI_tree_alive_remeasure
+#' @param NFI_tree_dead_remeasure
+#' @return A data.table object
+
+merge_NFI_remeasured <- function(NFI_tree_alive_remeasure, NFI_tree_dead_remeasure){
+  NFI_tree_dead_remeasure$c135 <- NA
+  NFI_tree_dead_remeasure$dead <- 1
+  NFI_tree_alive_remeasure %>%
+    mutate(dead = case_when(veget5 == "0" ~ 0, 
+                            TRUE ~ 1)) %>%
+    rbind(NFI_tree_dead_remeasure)
+}
+
+
+
+#### Section 2 - Format NFI for TreeMort ####
+#' @details Group of functions used to format NFI data for the TreeMort project. 
+#' @author Julien Barrere
+
+
+#' Format Species TreeMort
+#' @details Function to format the NFI species table to fit into TreeMort template
+#' @param NFI_species Table containing NFI species data (code, french and latin name)
+#' @param NFI_genus_species_correspondence Table linking genus of NFI_species to their family
+#' @return a data.table object
+
+Format_species_TreeMort <- function(NFI_species, NFI_genus_species_correspondence){
+  NFI_species %>% 
+    separate(Latin_name, into = c("genus", "species"), sep = "_") %>%
+    mutate(species = case_when(species == "sp" ~ NA_character_, 
+                               TRUE ~ species)) %>%
+    merge(NFI_genus_species_correspondence, by = "genus", all.x = T, all.y = F) %>%
+    rename(species.id = code) %>%
+    select(species.id, species, genus, family) %>%
+    distinct()
+} 
+
+
+#' Format Trees 1st Census TreeMort
+#' @details Function to format the NFI tree data (1st measurement) of dead and alive trees
+#'          to fit into TreeMort template
+#' @param NFI_tree NFI data at tree level for both dead and alive trees
+#' @param TreeMort_species NFI species data formatted for TreeMort
+#' @return A data.table object
+
+Format_trees_census1_TreeMort <- function(NFI_tree, TreeMort_species){
+  NFI_tree %>%
+    mutate(tree.id = paste(idp, a, sep = "_"), 
+           census.id = paste(idp, year, sep = "_"), 
+           d = c13*10/pi, 
+           pom = 130, 
+           ba = (c13*10)^2/(4*pi), 
+           mode.death = case_when(veget == "5" ~ "1s", 
+                                  veget %in% c("C", "A") ~ "1f"), 
+           mode.death.other = NA_character_, 
+           canopy.position = case_when(lib == 0 ~ 0, 
+                                       lib %in% c(1, 2) ~ 1), 
+           multistem = case_when(tige %in% c(1,7) ~ 0, 
+                                 tige %in% c(5,6) ~ 1)) %>%
+    rename(plot.id = idp, census.date = year, height = htot, tree.status = dead) %>%
+    merge(TreeMort_species, by.x = "espar", by.y = "species.id", all.x = T, all.y = F) %>%
+    select(tree.id, plot.id, census.id, census.date, species, genus, family, d, 
+           pom, height, ba, tree.status, mode.death, mode.death.other,
+           canopy.position, multistem)
+}
+
+
+
+#' Format Remeasured Trees (2nd census) TreeMort
+#' @details Function to format the NFI tree data (1st measurement) of dead and alive trees
+#'          to fit into TreeMort template
+#' @param NFI_tree_remeasured NFI data at tree level for both dead and alive remeasured trees
+#' @param TreeMort_tree_census1 NFI tree census1 data formatted for TreeMort
+#' @return A data.table object
+
+Format_trees_census2_TreeMort <- function(NFI_tree_remeasured, TreeMort_tree_census1){
+  NFI_tree_remeasured %>%
+    mutate(tree.id = paste(idp, a, sep = "_")) %>%
+    merge(TreeMort_tree_census1, by = "tree.id", all.x = T, all.y = F) %>%
+    mutate(census.id = paste(plot.id, (census.date +5), sep = "_"), 
+           census.date = census.date + 5, 
+           d = round(c135*1000/pi, digits = 0), 
+           ba = round((c135*1000)^2/(4*pi), digits = 0), 
+           height = NA_real_, 
+           tree.status = dead, 
+           mode.death = case_when(veget5 == "M" ~ "1s", 
+                                  veget5 %in% c("A", "1", "2") ~ "1f", 
+                                  veget5 %in% c("6", "7") ~ "2", 
+                                  veget5 %in% c("N", "T") ~ "3"), 
+           canopy.position = NA_real_) %>%
+    select(tree.id, plot.id, census.id, census.date, species, genus, family, d, 
+           pom, height, ba, tree.status, mode.death, mode.death.other,
+           canopy.position, multistem)
 }
