@@ -367,14 +367,32 @@ l93_to_degrees <- function(l93_data){
 }
 
 
+#' Compute NFI Plot Stand Age
+#' @details Function to the stand age of NFI plots from the NFI tree table
+#' @param NFI_tree Table containing NFI tree data from the first measurement (dead and alive trees)
+#' @return a data.table object
+
+Compute_NFI_stand_age <- function(NFI_tree){
+  NFI_tree %>%
+    group_by(idp) %>%
+    summarise(n = sum(!is.na(age)), 
+              mean = mean(age, na.rm = TRUE)) %>%
+    mutate(stand.age = case_when(n > 0 ~ mean, 
+                                 TRUE ~ NA_real_)) %>%
+    select(idp, stand.age)
+}
+
+
 #' Format Plots TreeMort
 #' @details Function to format the NFI plot table to fit into TreeMort template
 #' @param NFI_plot Table containing NFI plot data (code, french and latin name)
 #' @return a data.table object
 
-Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data){
+Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data, NFI_plot_elevation, NFI_stand_age){
   cbind(NFI_plot, l93_to_degrees(NFI_plot[, c("xl93", "yl93")])) %>%
     merge(NFI_ecological_data, by = "idp") %>%
+    merge(NFI_plot_elevation %>% mutate(idp = as.integer(as.character(idp))), by = "idp", all.x = T, all.y = F) %>%
+    merge(NFI_stand_age, by = "idp", all.x = T, all.y = F) %>%
     mutate(plot.id = idp, 
            cluster = NA_character_,
            country = "France", 
@@ -384,11 +402,51 @@ Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data){
                               expo %in% c(50:149) ~ "E", 
                               expo %in% c(150:249) ~ "S", 
                               expo %in% c(250:349) ~ "W"),
+           elevation = zp,
+           soil.depth = prof2, 
+           soil.depth.accuracy = case_when(obsprof == 1 ~ 1, 
+                                           obsprof %in% c(2,3) ~ 2, 
+                                           obsprof == 4 ~ 3),
+           soil.type = tsol,
            change.protocol = 0,
            d.threshold = 75, 
            plot.contact = "Julien BARRERE", 
            plot.contact.email = "julien.barrere@inrae.fr") %>%
     select(plot.id, latitude, longitude, cluster, country, active, slope, 
-           aspect, change.protocol, d.threshold, plot.contact, 
-           plot.contact.email)
+           aspect, elevation, soil.depth, soil.depth.accuracy, soil.type, 
+           stand.age, change.protocol, d.threshold, plot.contact, plot.contact.email)
 }
+
+
+#' Format Census TreeMort
+#' @details Function to create a census table to fit into TreeMort template
+#' @param TreeMort_tree Table containing NFI tree data formatted for treeMort
+#' @return a data.table object
+
+Format_census_TreeMort <- function(TreeMort_tree){
+  TreeMort_tree %>%
+    mutate(plot.area = NA_real_, 
+           lianas = 0, 
+           census.contact = "Julien BARRERE", 
+           census.contact.email = "julien.barrere@inrae.fr") %>%
+    select(plot.id, census.id, census.date, census.n, plot.area, 
+           lianas, census.contact, census.contact.email) %>%
+    distinct()
+}
+
+
+
+
+#' Format Meta-data TreeMort
+#' @details Function to create a metadata table containing important information on TreeMort formatting
+#' @return a data.table object 
+
+Meta_data_TreeMort <- function(){
+  data.frame(Variable = c("soil.depth", "soil.depth.accuracy", "stand.age", "soil.type"), 
+             File = c("plot_data.csv", "plot_data.csv", "plot_data.csv", "plot_data.csv"), 
+             Observation = c("Available by class. 0=0-4cm; 1=5-14cm; 2=15-24cm; […]; 8=75-84cm; 9>84cm ", 
+                             "Soil depth is 1=accurate, 2=likely understimated, 3=likely overestimated", 
+                             "Age at 130cm of the two oldest trees in the stand", 
+                             "For correspondance, see the table on the two last pages of https://inventaire-forestier.ign.fr/IMG/pdf/IFN_campagne2008_documentation_donnees-brutes_pointforet.pdf"))
+}
+

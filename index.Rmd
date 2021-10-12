@@ -48,7 +48,7 @@ tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
 
 We start by importing the following data on: 
 
-- NFI plots (`NFI_plot`) and associated ecological data (`NFI_ecological_data`)
+- NFI plots (`NFI_plot`) and associated ecological data (`NFI_ecological_data`) and elevation (`NFI_plot_elevation`)
 - NFI individual trees that were either alive (`NFI_tree_alive`) or dead (`NFI_tree_dead`) 
 - NFI plots remeasured (`NFI_plot_remeasure`) 
 - Individual trees remeasured that were either alive  (`NFI_tree_alive_remeasure`) or dead (`NFI_tree_dead_remeasure`) at first measurement. 
@@ -56,6 +56,7 @@ We start by importing the following data on:
 ```{targets import-NFI-data}
 list(
   tar_target(NFI_plot, read_plot(path = "data/FrenchNFI")), 
+  tar_target(NFI_plot_elevation, read.csv("data/elevation_NFIplots.csv", sep = ";")),
   tar_target(NFI_ecological_data, read_ecological_data(path = "data/FrenchNFI")),
   tar_target(NFI_tree_alive, read_tree(path = "data/FrenchNFI")), 
   tar_target(NFI_tree_dead, read_dead_tree(path = "data/FrenchNFI")), 
@@ -138,12 +139,41 @@ write.table(tar_read(TreeMort_tree),
 We format the `NFI_plot` table to fit into TreeMort template, and we write the formated table (`TreeMort_plot`) in the TreeMort directory.
 
 ```{targets format-plots-NFI-to-TreeMort}
-tar_target(TreeMort_plot, Format_plots_TreeMort(NFI_plot, NFI_ecological_data))
+list(
+  tar_target(NFI_stand_age, Compute_NFI_stand_age(NFI_tree)), 
+  tar_target(TreeMort_plot, Format_plots_TreeMort(NFI_plot, NFI_ecological_data, NFI_plot_elevation, NFI_stand_age))
+)
 ```
 
 ```{r}
 write.table(tar_read(TreeMort_plot), 
           file = "data/TreeMort/plot_data.csv", row.names = F)
+```
+
+### Census data
+
+We format the `TreeMort_tree` table to create a census table fitting TreeMort template, and we write the formated table (`TreeMort_census`) in the TreeMort directory.
+
+```{targets format-census-TreeMort}
+tar_target(TreeMort_census, Format_census_TreeMort(TreeMort_tree))
+```
+
+```{r}
+write.table(tar_read(TreeMort_census), 
+          file = "data/TreeMort/census_data.csv", row.names = F)
+```
+
+### Meta data
+
+We write a metadata table in the TreeMort directory to specify important information on some columns. 
+
+```{targets metadata-TreeMort}
+tar_target(TreeMort_metadata, Meta_data_TreeMort())
+```
+
+```{r}
+write.table(tar_read(TreeMort_metadata), 
+          file = "data/TreeMort/meta_data.csv", row.names = F)
 ```
 
 
@@ -154,6 +184,8 @@ If you ran all the `{targets}` chunks in non-interactive mode, then your R scrip
 ```{r}
 tar_make()
 ```
+
+
 
 # Output
 
