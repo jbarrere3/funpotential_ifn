@@ -18,7 +18,7 @@ We start by loading the required packages. `targets` must be version 0.5.0.9000 
 ```{r, eval = FALSE}
 require(c("dplyr", "ggplot2", "targets", "tidyr", 
                             "RColorBrewer", "lme4", "data.table", 
-                            "knitr", "stringr", "measurements"))
+                            "knitr", "stringr", "measurements", "sf"))
 ```
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
@@ -37,7 +37,7 @@ options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
 tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr", 
                             "RColorBrewer", "lme4", "data.table", 
-                            "knitr", "stringr", "measurements"))
+                            "knitr", "stringr", "measurements", "sf"))
 ```
 
 # Targets
@@ -48,7 +48,7 @@ tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
 
 We start by importing the following data on: 
 
-- NFI plots (`NFI_plot`) 
+- NFI plots (`NFI_plot`) and associated ecological data (`NFI_ecological_data`)
 - NFI individual trees that were either alive (`NFI_tree_alive`) or dead (`NFI_tree_dead`) 
 - NFI plots remeasured (`NFI_plot_remeasure`) 
 - Individual trees remeasured that were either alive  (`NFI_tree_alive_remeasure`) or dead (`NFI_tree_dead_remeasure`) at first measurement. 
@@ -56,6 +56,7 @@ We start by importing the following data on:
 ```{targets import-NFI-data}
 list(
   tar_target(NFI_plot, read_plot(path = "data/FrenchNFI")), 
+  tar_target(NFI_ecological_data, read_ecological_data(path = "data/FrenchNFI")),
   tar_target(NFI_tree_alive, read_tree(path = "data/FrenchNFI")), 
   tar_target(NFI_tree_dead, read_dead_tree(path = "data/FrenchNFI")), 
   tar_target(NFI_plot_remeasure, read_reameasure_plot(path = "data/FrenchNFI_remeasure")), 
@@ -118,12 +119,32 @@ list(
 )
 ```
 
-And we merge these two dataframes to obtain the complete tree NFI dataset formatted for TreeMort. 
+We merge these two dataframes to obtain the complete tree NFI dataset formatted for TreeMort (`TreeMort_tree`), that we write in the TreeMort directory. 
 
 ```{targets format-trees-NFI-to-TreeMort}
-tar_target(TreeMort_tree, rbind(TreeMort_tree_census1, TreeMort_tree_census2))
+tar_target(TreeMort_tree, 
+           rbind(subset(TreeMort_tree_census1, 
+                        plot.id %in% TreeMort_tree_census2$plot.id),
+                 TreeMort_tree_census2))
 ```
 
+```{r}
+write.table(tar_read(TreeMort_tree), 
+          file = "data/TreeMort/tree_data.csv", row.names = F)
+```
+
+### Plots data
+
+We format the `NFI_plot` table to fit into TreeMort template, and we write the formated table (`TreeMort_plot`) in the TreeMort directory.
+
+```{targets format-plots-NFI-to-TreeMort}
+tar_target(TreeMort_plot, Format_plots_TreeMort(NFI_plot, NFI_ecological_data))
+```
+
+```{r}
+write.table(tar_read(TreeMort_plot), 
+          file = "data/TreeMort/plot_data.csv", row.names = F)
+```
 
 
 # Pipeline

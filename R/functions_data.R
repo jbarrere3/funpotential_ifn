@@ -292,20 +292,21 @@ Format_species_TreeMort <- function(NFI_species, NFI_genus_species_correspondenc
 Format_trees_census1_TreeMort <- function(NFI_tree, TreeMort_species){
   NFI_tree %>%
     mutate(tree.id = paste(idp, a, sep = "_"), 
-           census.id = paste(idp, year, sep = "_"), 
-           d = c13*10/pi, 
+           census.id = paste(idp, year, sep = "_"),
+           census.n = 1,
+           d = round(c13*10/pi, digits = 0), 
            pom = 130, 
-           ba = (c13*10)^2/(4*pi), 
+           ba = round((c13*10)^2/(4*pi), digits = 0), 
            mode.death = case_when(veget == "5" ~ "1s", 
                                   veget %in% c("C", "A") ~ "1f"), 
-           mode.death.other = NA_character_, 
+           mode.death.other = NA_real_, 
            canopy.position = case_when(lib == 0 ~ 0, 
                                        lib %in% c(1, 2) ~ 1), 
            multistem = case_when(tige %in% c(1,7) ~ 0, 
                                  tige %in% c(5,6) ~ 1)) %>%
     rename(plot.id = idp, census.date = year, height = htot, tree.status = dead) %>%
     merge(TreeMort_species, by.x = "espar", by.y = "species.id", all.x = T, all.y = F) %>%
-    select(tree.id, plot.id, census.id, census.date, species, genus, family, d, 
+    select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
            pom, height, ba, tree.status, mode.death, mode.death.other,
            canopy.position, multistem)
 }
@@ -325,6 +326,7 @@ Format_trees_census2_TreeMort <- function(NFI_tree_remeasured, TreeMort_tree_cen
     merge(TreeMort_tree_census1, by = "tree.id", all.x = T, all.y = F) %>%
     mutate(census.id = paste(plot.id, (census.date +5), sep = "_"), 
            census.date = census.date + 5, 
+           census.n = 2,
            d = round(c135*1000/pi, digits = 0), 
            ba = round((c135*1000)^2/(4*pi), digits = 0), 
            height = NA_real_, 
@@ -333,8 +335,60 @@ Format_trees_census2_TreeMort <- function(NFI_tree_remeasured, TreeMort_tree_cen
                                   veget5 %in% c("A", "1", "2") ~ "1f", 
                                   veget5 %in% c("6", "7") ~ "2", 
                                   veget5 %in% c("N", "T") ~ "3"), 
+           mode.death.other = NA_real_,
            canopy.position = NA_real_) %>%
-    select(tree.id, plot.id, census.id, census.date, species, genus, family, d, 
+    select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
            pom, height, ba, tree.status, mode.death, mode.death.other,
            canopy.position, multistem)
+}
+
+
+
+
+#' Convert L93 to degree
+#' @details Function to convert the L93 plot coordinates of the NFI plots into degrees
+#' @param l93_data dataframe with two columns: x and y coordinates in L93
+#' @return A dataframe with two columns, lon and lat. 
+
+l93_to_degrees <- function(l93_data){
+  colnames(l93_data) <- c("lon", "lat")
+  l93_data <- l93_data %>%
+    st_as_sf(coords = c("lon", "lat")) %>%
+    st_set_crs(2154) %>% 
+    st_transform(4326) %>%
+    as.data.frame %>%
+    dplyr::mutate(geometry = as.character(geometry))
+  out <- data.frame(longitude = array(NA, dim = dim(l93_data)[1]), 
+                    latitude = array(NA, dim = dim(l93_data)[1]))
+  for(i in 1:dim(l93_data)[1]){
+    out[i, ] <- strsplit(substring(as.character(l93_data[i, 1]), 3, nchar(as.character(l93_data[i, 1])) -1),"\\, ")[[1]]
+  }  
+  out                  
+}
+
+
+#' Format Plots TreeMort
+#' @details Function to format the NFI plot table to fit into TreeMort template
+#' @param NFI_plot Table containing NFI plot data (code, french and latin name)
+#' @return a data.table object
+
+Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data){
+  cbind(NFI_plot, l93_to_degrees(NFI_plot[, c("xl93", "yl93")])) %>%
+    merge(NFI_ecological_data, by = "idp") %>%
+    mutate(plot.id = idp, 
+           cluster = NA_character_,
+           country = "France", 
+           active = 0, 
+           slope = round(atan(pent2/100)/0.0174515207, digits = 2),
+           aspect = case_when(expo %in% c(c(0:49), c(350:400)) ~ "N", 
+                              expo %in% c(50:149) ~ "E", 
+                              expo %in% c(150:249) ~ "S", 
+                              expo %in% c(250:349) ~ "W"),
+           change.protocol = 0,
+           d.threshold = 75, 
+           plot.contact = "Julien BARRERE", 
+           plot.contact.email = "julien.barrere@inrae.fr") %>%
+    select(plot.id, latitude, longitude, cluster, country, active, slope, 
+           aspect, change.protocol, d.threshold, plot.contact, 
+           plot.contact.email)
 }
