@@ -1,0 +1,1 @@
+tar_target(NFI_census_management, compute_management_census(NFI_plot, NFI_plot_remeasure))

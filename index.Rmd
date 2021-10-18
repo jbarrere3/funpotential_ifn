@@ -80,6 +80,7 @@ list(
 )
 ```
 
+
 ## Data formating - TreeMort project
 
 ### Species data
@@ -125,7 +126,7 @@ We merge these two dataframes to obtain the complete tree NFI dataset formatted 
 ```{targets format-trees-NFI-to-TreeMort}
 tar_target(TreeMort_tree, 
            rbind(subset(TreeMort_tree_census1, 
-                        plot.id %in% TreeMort_tree_census2$plot.id),
+                        tree.id %in% TreeMort_tree_census2$tree.id),
                  TreeMort_tree_census2))
 ```
 
@@ -152,10 +153,16 @@ write.table(tar_read(TreeMort_plot),
 
 ### Census data
 
+First, we need to create a management variable describing the occurence of a cut in the last 5 years for each census. 
+
+```{targets create-management-census}
+tar_target(NFI_census_management, compute_management_census(NFI_plot, NFI_plot_remeasure))
+```
+
 We format the `TreeMort_tree` table to create a census table fitting TreeMort template, and we write the formated table (`TreeMort_census`) in the TreeMort directory.
 
 ```{targets format-census-TreeMort}
-tar_target(TreeMort_census, Format_census_TreeMort(TreeMort_tree))
+tar_target(TreeMort_census, Format_census_TreeMort(TreeMort_tree, NFI_census_management))
 ```
 
 ```{r}

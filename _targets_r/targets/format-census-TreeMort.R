@@ -1,1 +1,1 @@
-tar_target(TreeMort_census, Format_census_TreeMort(TreeMort_tree))
+tar_target(TreeMort_census, Format_census_TreeMort(TreeMort_tree, NFI_census_management))

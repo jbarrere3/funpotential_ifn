@@ -303,11 +303,12 @@ Format_trees_census1_TreeMort <- function(NFI_tree, TreeMort_species){
            canopy.position = case_when(lib == 0 ~ 0, 
                                        lib %in% c(1, 2) ~ 1), 
            multistem = case_when(tige %in% c(1,7) ~ 0, 
-                                 tige %in% c(5,6) ~ 1)) %>%
+                                 tige %in% c(5,6) ~ 1), 
+           statistical.weight = w) %>%
     rename(plot.id = idp, census.date = year, height = htot, tree.status = dead) %>%
     merge(TreeMort_species, by.x = "espar", by.y = "species.id", all.x = T, all.y = F) %>%
     select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
-           pom, height, ba, tree.status, mode.death, mode.death.other,
+           pom, height, statistical.weight, ba, tree.status, mode.death, mode.death.other,
            canopy.position, multistem)
 }
 
@@ -336,9 +337,10 @@ Format_trees_census2_TreeMort <- function(NFI_tree_remeasured, TreeMort_tree_cen
                                   veget5 %in% c("6", "7") ~ "2", 
                                   veget5 %in% c("N", "T") ~ "3"), 
            mode.death.other = NA_real_,
-           canopy.position = NA_real_) %>%
+           canopy.position = NA_real_, 
+           statistical.weight = NA_real_) %>%
     select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
-           pom, height, ba, tree.status, mode.death, mode.death.other,
+           pom, height, statistical.weight, ba, tree.status, mode.death, mode.death.other,
            canopy.position, multistem)
 }
 
@@ -418,19 +420,39 @@ Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data, NFI_plot_elevat
 }
 
 
+#' Compute management per census
+#' @details Function to associate a "management" value to each census
+#' @param NFI_plot Table containing NFI plot data 
+#' @param NFI_plot_remeasure Table containing NFI plot data for remeasured plots
+#' @return a data.table object
+
+compute_management_census <- function(NFI_plot, NFI_plot_remeasure){
+  rbind((NFI_plot %>% select(idp, dc, year)), 
+        (NFI_plot_remeasure %>% select(idp, dc5, year) %>% rename(dc = dc5))) %>%
+    mutate(management = case_when(dc == 0 ~ 0, 
+                                  dc > 0 ~ 1), 
+           census.id = paste(idp, year, sep = "_")) %>%
+    select(census.id, management)
+}
+
+
+
+
 #' Format Census TreeMort
 #' @details Function to create a census table to fit into TreeMort template
 #' @param TreeMort_tree Table containing NFI tree data formatted for treeMort
+#' @param NFI_census_management Table containing the variable management for each census 
 #' @return a data.table object
 
-Format_census_TreeMort <- function(TreeMort_tree){
+Format_census_TreeMort <- function(TreeMort_tree, NFI_census_management){
   TreeMort_tree %>%
+    merge(NFI_census_management, by = "census.id", all.x = T, all.y = F) %>%
     mutate(plot.area = NA_real_, 
            lianas = 0, 
            census.contact = "Julien BARRERE", 
            census.contact.email = "julien.barrere@inrae.fr") %>%
     select(plot.id, census.id, census.date, census.n, plot.area, 
-           lianas, census.contact, census.contact.email) %>%
+           management, lianas, census.contact, census.contact.email) %>%
     distinct()
 }
 
@@ -442,11 +464,13 @@ Format_census_TreeMort <- function(TreeMort_tree){
 #' @return a data.table object 
 
 Meta_data_TreeMort <- function(){
-  data.frame(Variable = c("soil.depth", "soil.depth.accuracy", "stand.age", "soil.type"), 
-             File = c("plot_data.csv", "plot_data.csv", "plot_data.csv", "plot_data.csv"), 
-             Observation = c("Available by class. 0=0-4cm; 1=5-14cm; 2=15-24cm; […]; 8=75-84cm; 9>84cm ", 
+  data.frame(File = c("tree_data.csv", "plot_data.csv", "plot_data.csv", "plot_data.csv", "plot_data.csv", "census_data.csv"), 
+             Variable = c("statistical.weight", "soil.depth", "soil.depth.accuracy", "stand.age", "soil.type", "management"), 
+             Observation = c("Number of trees that this sample represent per ha (.ha-1).", 
+                             "Available by class. 0=0-4cm; 1=5-14cm; 2=15-24cm; […]; 8=75-84cm; 9>84cm ", 
                              "Soil depth is 1=accurate, 2=likely understimated, 3=likely overestimated", 
                              "Age at 130cm of the two oldest trees in the stand", 
-                             "For correspondance, see the table on the two last pages of https://inventaire-forestier.ign.fr/IMG/pdf/IFN_campagne2008_documentation_donnees-brutes_pointforet.pdf"))
+                             "For correspondance, see the table on the two last pages of https://inventaire-forestier.ign.fr/IMG/pdf/IFN_campagne2008_documentation_donnees-brutes_pointforet.pdf", 
+                             "Occurrence of a cut (=1) or not (=0) during the 5 years preceeding the census"))
 }
 
