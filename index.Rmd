@@ -35,6 +35,7 @@ We define some global options/functions common to all targets, and load the func
 ```{targets example-globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
+source("R/FUNDIV/FUNDIV_Data.R")
 tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr", 
                             "RColorBrewer", "lme4", "data.table", 
                             "knitr", "stringr", "measurements", "sf"))
@@ -182,6 +183,26 @@ tar_target(TreeMort_metadata, Meta_data_TreeMort())
 write.table(tar_read(TreeMort_metadata), 
           file = "data/TreeMort/meta_data.csv", row.names = F)
 ```
+
+## Adding remeasured NFI to FUNDIV dataset
+
+### Import FUNDIV trees data
+
+We start by importing the tree (`FUNDIV_tree`) and plot (`FUNDIV_plot`) datatables of FUNDIV. 
+```{targets import-FUNDIV}
+list(
+  tar_target(FUNDIV_tree, read_FUNDIV_tree_data(data_path = "data/FUNDIV", remove_harv = TRUE)), 
+  tar_target(FUNDIV_plot, read_FUNDIV_plot_data(data_path = "data/FUNDIV"))
+)
+```
+
+
+Using `FUNDIV_plot` dataset, we can format the NFI trees that were measured twice to FUNDIV template. 
+```{targets format-trees-TreeMort-to-FUNDIV}
+tar_target(FUNDIV_FrenchNFI_tree, 
+           Format_trees_TreeMort_to_FUNDIV(TreeMort_tree, TreeMort_plot, FUNDIV_plot))
+```
+
 
 
 # Pipeline

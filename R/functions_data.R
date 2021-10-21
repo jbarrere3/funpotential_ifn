@@ -12,10 +12,12 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Section 1 - Read French NFI ####
 #' @description Group of functions used to read French NFI data
 #' @authors Georges Kunstler - Patrick Vallet - Björn Reineking (INRAE - LESSEM)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 #' Read IFN data for each year
 #'
@@ -258,10 +260,12 @@ merge_NFI_remeasured <- function(NFI_tree_alive_remeasure, NFI_tree_dead_remeasu
 }
 
 
-
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Section 2 - Format NFI for TreeMort ####
+#'
 #' @details Group of functions used to format NFI data for the TreeMort project. 
 #' @author Julien Barrere
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
 #' Format Species TreeMort
@@ -474,3 +478,70 @@ Meta_data_TreeMort <- function(){
                              "Occurrence of a cut (=1) or not (=0) during the 5 years preceeding the census"))
 }
 
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 3 - TreeMort to FUNDIV ####
+#'
+#' @details Group of functions used to format and merge French NFI remeasured data to FUNDIV dataset. 
+#' @author Julien Barrere
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#' Format tree from to FUNDIV
+#' @details Function to format tree data from TreeMort format to FUNDIV template
+#' @param TreeMort_tree Tree table of NFI data formatted for TreeMort
+#' @param TreeMort_plot Plot table of NFI data formatted for TreeMort
+#' @param FUNDIV_plot Plot tables already formatted to FUNDIV template
+#' @return a tree table of French NFI remeasured data formatted for FUNDIV
+
+Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, TreeMort_plot, FUNDIV_plot){
+  # 1st step: format FNDIV_plot to merge it with TreeMort_tree table (to get climatic data)
+  FUNDIV_plot.in <- FUNDIV_plot %>%
+    filter(country == "FG") %>%
+    separate(plotcode, into = c("plot.id", "country2"), sep = "_") %>%
+    mutate(plot.id = as.integer(plot.id)) %>%
+    select(plot.id, map.wc, wai.wc, mat.wc, mat, sgdd, spring_frosts, map, 
+           wai, p_pet_yr, sws, p_pet_summer, spei_min, spei_mean)
+  
+  # 2nd step: Create FUNDIV tree from 1st census TreeMort table
+  subset(TreeMort_tree, census.n == 1) %>%
+    # Add longitude and latitude
+    merge((TreeMort_plot %>% select(plot.id, latitude, longitude)), 
+          by = "plot.id", all.x = T, all.y = F) %>%
+    rename(dbh1 = d, start_year = census.date, n_ha2 = statistical.weight) %>%
+    # Only keep trees that were alive during 1st census
+    filter(tree.status == 0) %>%
+    select(-tree.status, -mode.death) %>%
+    # Add remeasured trees
+    merge((subset(TreeMort_tree, census.n == 2) %>% select(tree.id, d, tree.status, mode.death) %>% rename(dbh2 = d)), 
+          by = "tree.id", all.x = T, all.y = F) %>%
+    mutate(plotcode = as.character(plot.id), 
+           sp = paste(genus, species, sep = " "), 
+           yearsbetweensurveys = as.integer(5), 
+           cluster = NA_integer_, 
+           country = "FR", 
+           ba_ha2 = NA_real_, 
+           management = 0, 
+           surveydate2 = NA_character_, 
+           BATOTcomp = NA_real_, 
+           treestatus_th = case_when((dbh1 >= 100 & tree.status == 0) ~ 2, # Alive and dbh1 >10: "survivor"
+                                     (dbh1 < 100 & dbh2 < 100) ~ 99, # Still lower than 10cm : To remove ?
+                                     mode.death == "2" ~ 3, # Dead harvested : "Harvested"
+                                     mode.death == "1s" ~ 4, # Dead standing : "dead + stem present" (natural mortality)
+                                     mode.death %in% c("1f", "3") ~ 5, # Dead fallen or no information about death: "dead + stem absent"
+                                     (dbh1 < 100 & dbh2 >= 100) ~ 1)) %>% # Grew above dbh100 : "ingrowth"
+    filter(treestatus_th != 99) %>%
+    merge(FUNDIV_plot.in, by = "plot.id", all.x = T, all.y = F) %>% # Add climatic variables
+    # Correct inapropriate formats
+    mutate(treecode2 = tree.id,
+           plotcode = paste0(plotcode, "_FR"),
+           latitude = as.numeric(latitude), 
+           longitude = as.numeric(longitude), 
+           treestatus_th = as.integer(treestatus_th),
+           start_year = as.integer(start_year)) %>%
+    select(plotcode, treestatus_th, dbh1, dbh2, ba_ha2, country, sp, cluster, 
+           longitude, latitude, yearsbetweensurveys, management, surveydate2, 
+           start_year, map.wc, wai.wc, mat.wc, mat, sgdd, spring_frosts, map, 
+           wai, p_pet_yr, sws, p_pet_summer, spei_min, spei_mean, n_ha2,
+           BATOTcomp, treecode2)
+}
