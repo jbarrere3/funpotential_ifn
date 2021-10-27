@@ -545,3 +545,70 @@ Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, TreeMort_plot, FUNDIV
            wai, p_pet_yr, sws, p_pet_summer, spei_min, spei_mean, n_ha2,
            BATOTcomp, treecode2)
 }
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 4 - R. Seidl & C. Senf disturbance data       ####
+#' @description Functions used to read disturbance spatial data
+#' @authors Julien BARRERE
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+library(raster)
+library(rgdal)
+library(sf)
+
+
+#' Get disturbance per plot
+#' @description Function to get the disturbanc etype and year from C. Senf for each plot
+#' @param country character: english name of the country, in lower cases (e.g., "france", "spain")
+#' @param buffer numeric: radius of the buffer aroutn plot center to get disturbance value
+#' @param FUNDIV_tree Tree table of FUNDIV data
+#' @param dir Directory where disturbance data are stored
+
+Get_disturbance_per_plot <- function(country, buffer, FUNDIV_tree, dir){
+  print(paste0("Getting disturbance value for ", country))
+  
+  ## Step 1 - Get raster data
+  print("-- Getting disturbance raster")
+  disturbance_type_raster.in <- raster(paste0(dir, "/storm_fire_other_classification_", 
+                                              country, ".tif"))
+  disturbance_year_raster.in <- raster(paste0(dir, "/disturbance_year_1986-2020_", 
+                                              country, ".tif"))
+  
+  ## Step 2 - Create a SPDF with a buffer around each FUNDIV plots
+  print("-- Creating SPDF for FUNDIV plots")
+  # Extract the country code in FUNDIV dataset
+  countrycodes.in <- data.frame(code = c("DE", "ES", "FI", "FR", "SW", "WA"), 
+                                country = c("germany", "spain", "finland", 
+                                            "france", "sweden", "belgium"))
+  this_countrycode.in <- countrycodes.in$code[which(countrycodes.in$country == country)]
+  # Create Spatial Polygon from plot coordinates
+  FUNDIV_plots_polygon.in <-  FUNDIV_tree %>%
+    rename(lon = longitude, lat = latitude) %>%
+    filter(country == this_countrycode.in) %>%
+    dplyr::select(plotcode, lon, lat) %>%
+    distinct 
+  coordinates(FUNDIV_plots_polygon.in) = ~lon+lat
+  proj4string(FUNDIV_plots_polygon.in) <- CRS("+proj=longlat +datum=WGS84")
+  FUNDIV_plots_polygon.in <- spTransform(FUNDIV_plots_polygon.in, 
+                                         crs(disturbance_type_raster.in))
+  # Create a buffer around each plot
+  FUNDIV_plots_polygon.in <- gBuffer(FUNDIV_plots_polygon.in, 
+                                     width = buffer, byid = T)
+  
+  ## Step 3 : Extract raster values within each plot
+  print("-- Extracting raster value within each plot")
+  out <- data.frame(plotcode = FUNDIV_plots_polygon.in@data$plotcode)
+  out$disturbance.type <- exact_extract(disturbance_type_raster.in, 
+                                        FUNDIV_plots_polygon.in, 
+                                        fun = 'majority')
+  out$disturbance.year <- exact_extract(disturbance_year_raster.in, 
+                                        FUNDIV_plots_polygon.in, 
+                                        fun = 'majority')
+  out <- out %>%
+    mutate(disturbance.year = case_when(disturbance.type > 0 ~ disturbance.year, 
+                                        TRUE ~ NA_real_)) %>% data.frame
+  return(out)
+}
+ 

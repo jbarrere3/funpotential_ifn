@@ -16,9 +16,9 @@ This R Markdown aims at testing the functioning of the `targets` package to prod
 We start by loading the required packages. `targets` must be version 0.5.0.9000 or above. 
 
 ```{r, eval = FALSE}
-require(c("dplyr", "ggplot2", "targets", "tidyr", 
-                            "RColorBrewer", "lme4", "data.table", 
-                            "knitr", "stringr", "measurements", "sf"))
+require(c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
+          "data.table", "knitr", "stringr", "measurements", "sf", "raster",
+          "rgdal", "exactextractr", "rgeos"))
 ```
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
@@ -36,9 +36,10 @@ We define some global options/functions common to all targets, and load the func
 options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
 source("R/FUNDIV/FUNDIV_Data.R")
-tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr", 
-                            "RColorBrewer", "lme4", "data.table", 
-                            "knitr", "stringr", "measurements", "sf"))
+tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
+                            "RColorBrewer", "lme4","data.table", "knitr",
+                            "stringr", "measurements", "sf", "raster",
+                            "rgdal", "exactextractr", "rgeos"))
 ```
 
 # Targets
@@ -184,14 +185,14 @@ write.table(tar_read(TreeMort_metadata),
           file = "data/TreeMort/meta_data.csv", row.names = F)
 ```
 
-## Adding remeasured NFI to FUNDIV dataset
+## FUNDIV dataset
 
-### Import FUNDIV trees data
+### Include NFI remeasured data in FUNDIV dataset
 
-We start by importing the tree (`FUNDIV_tree`) and plot (`FUNDIV_plot`) datatables of FUNDIV. 
+We start by importing the tree (`FUNDIV_tree_original`) and plot (`FUNDIV_plot`) datatables of FUNDIV. 
 ```{targets import-FUNDIV}
 list(
-  tar_target(FUNDIV_tree, read_FUNDIV_tree_data(data_path = "data/FUNDIV", remove_harv = TRUE)), 
+  tar_target(FUNDIV_tree_original, read_FUNDIV_tree_data(data_path = "data/FUNDIV", remove_harv = TRUE)), 
   tar_target(FUNDIV_plot, read_FUNDIV_plot_data(data_path = "data/FUNDIV"))
 )
 ```
@@ -203,13 +204,66 @@ tar_target(FUNDIV_FrenchNFI_tree,
            Format_trees_TreeMort_to_FUNDIV(TreeMort_tree, TreeMort_plot, FUNDIV_plot))
 ```
 
+Lastly, we can replace the French data in the original FUNDIV tree dataset by the newly formatted `FUNDIV_FrenchNFI_tree`. 
 
+```{targets replace-FrenchNFI-FUNDIV}
+tar_target(FUNDIV_tree, 
+           (FUNDIV_tree_original %>% 
+             filter(country != "FR") %>% 
+             rbind(FUNDIV_FrenchNFI_tree)))
+```
+
+
+### Import disturbance data
+
+For each country, we create a dataset containing the dusturbance type ([Senf & Seidl, 2021a](https://doi.org/10.1111/gcb.15679)) and year ([Senf & Seidl, 2021b](https://www.nature.com/articles/s41893-020-00609-y)) for each plot (if any disturbance occured). 
+
+```{targets import-disturbance-Senf}
+list(
+  tar_target(FUNDIV_Plots_disturbance_belgium, 
+             Get_disturbance_per_plot("belgium", 50, FUNDIV_tree,
+                                      "data/Disturbance")), 
+  tar_target(FUNDIV_Plots_disturbance_france, 
+             Get_disturbance_per_plot("france", 500, FUNDIV_tree,
+                                      "data/Disturbance")), 
+  tar_target(FUNDIV_Plots_disturbance_germany, 
+             Get_disturbance_per_plot("germany", 50, FUNDIV_tree,
+                                      "data/Disturbance")), 
+  tar_target(FUNDIV_Plots_disturbance_finland, 
+             Get_disturbance_per_plot("finland", 50, FUNDIV_tree,
+                                      "data/Disturbance")), 
+  tar_target(FUNDIV_Plots_disturbance_sweden, 
+             Get_disturbance_per_plot("sweden", 50, FUNDIV_tree,
+                                      "data/Disturbance")), 
+  tar_target(FUNDIV_Plots_disturbance_spain, 
+             Get_disturbance_per_plot("spain", 50, FUNDIV_tree,
+                                      "data/Disturbance"))
+)
+```
+
+We merge these datasets to have disturbance data for all FUNDIV plots. 
+
+```{targets merge-disturbance-plots}
+tar_target(FUNDIV_Plots_disturbance, 
+           rbind.data.frame(FUNDIV_Plots_disturbance_belgium,
+                            FUNDIV_Plots_disturbance_france, 
+                            FUNDIV_Plots_disturbance_germany, 
+                            FUNDIV_Plots_disturbance_finland, 
+                            FUNDIV_Plots_disturbance_sweden, 
+                            FUNDIV_Plots_disturbance_spain))
+```
+
+```{targets Add-disturbance-to-FUNDIV-tree}
+tar_target(FUNDIV_tree_withdisturbance, 
+           merge(FUNDIV_tree, FUNDIV_Plots_disturbance, 
+                 by = "plotcode", all.x = T, all.y = F))
+```
 
 # Pipeline
 
 If you ran all the `{targets}` chunks in non-interactive mode, then your R scripts are set up to run the pipeline.
 
-```{r}
+```{r, message=FALSE, results='hide'}
 tar_make()
 ```
 
