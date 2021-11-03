@@ -432,7 +432,7 @@ Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data, NFI_plot_elevat
 
 compute_management_census <- function(NFI_plot, NFI_plot_remeasure){
   rbind((NFI_plot %>% select(idp, dc, year)), 
-        (NFI_plot_remeasure %>% select(idp, dc5, year) %>% rename(dc = dc5))) %>%
+        (NFI_plot_remeasure %>% select(idp, dc5, year) %>% rename(dc = dc5) %>% mutate(year = year + 5))) %>%
     mutate(management = case_when(dc == 0 ~ 0, 
                                   dc > 0 ~ 1), 
            census.id = paste(idp, year, sep = "_")) %>%
@@ -611,4 +611,4 @@ Get_disturbance_per_plot <- function(country, buffer, FUNDIV_tree, dir){
                                         TRUE ~ NA_real_)) %>% data.frame
   return(out)
 }
- 
+

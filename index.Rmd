@@ -9,8 +9,6 @@ output: html_document
 knitr::opts_chunk$set(collapse = TRUE, comment = "#>")
 ```
 
-This R Markdown aims at testing the functioning of the `targets` package to produce R Markdown documents. 
-
 # Packages and set up
 
 We start by loading the required packages. `targets` must be version 0.5.0.9000 or above. 
@@ -18,7 +16,8 @@ We start by loading the required packages. `targets` must be version 0.5.0.9000 
 ```{r, eval = FALSE}
 require(c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
           "data.table", "knitr", "stringr", "measurements", "sf", "raster",
-          "rgdal", "exactextractr", "rgeos"))
+          "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
+          "ggspatial"))
 ```
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
@@ -35,11 +34,13 @@ We define some global options/functions common to all targets, and load the func
 ```{targets example-globals, tar_globals = TRUE}
 options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
+source("R/functions_plot.R")
 source("R/FUNDIV/FUNDIV_Data.R")
 tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
                             "RColorBrewer", "lme4","data.table", "knitr",
                             "stringr", "measurements", "sf", "raster",
-                            "rgdal", "exactextractr", "rgeos"))
+                            "rgdal", "exactextractr", "rgeos", "rnaturalearth",
+                            "rnaturalearthdata", "ggspatial"))
 ```
 
 # Targets
@@ -216,24 +217,24 @@ tar_target(FUNDIV_tree,
 
 ### Import disturbance data
 
-For each country, we create a dataset containing the dusturbance type ([Senf & Seidl, 2021a](https://doi.org/10.1111/gcb.15679)) and year ([Senf & Seidl, 2021b](https://www.nature.com/articles/s41893-020-00609-y)) for each plot (if any disturbance occured). 
+For each country, we create a dataset containing the dusturbance type ([Senf & Seidl, 2021a](https://doi.org/10.1111/gcb.15679)) and year ([Senf & Seidl, 2021b](https://www.nature.com/articles/s41893-020-00609-y)) for each plot (if any disturbance occured). Since the french coordinates are blured (500m), we include a larger buffer for french data. 
 
 ```{targets import-disturbance-Senf}
 list(
   tar_target(FUNDIV_Plots_disturbance_belgium, 
-             Get_disturbance_per_plot("belgium", 50, FUNDIV_tree,
+             Get_disturbance_per_plot("belgium", 15, FUNDIV_tree,
                                       "data/Disturbance")), 
   tar_target(FUNDIV_Plots_disturbance_france, 
-             Get_disturbance_per_plot("france", 500, FUNDIV_tree,
+             Get_disturbance_per_plot("france", 15, FUNDIV_tree,
                                       "data/Disturbance")), 
   tar_target(FUNDIV_Plots_disturbance_germany, 
-             Get_disturbance_per_plot("germany", 50, FUNDIV_tree,
+             Get_disturbance_per_plot("germany", 15, FUNDIV_tree,
                                       "data/Disturbance")), 
   tar_target(FUNDIV_Plots_disturbance_finland, 
-             Get_disturbance_per_plot("finland", 50, FUNDIV_tree,
+             Get_disturbance_per_plot("finland", 15, FUNDIV_tree,
                                       "data/Disturbance")), 
   tar_target(FUNDIV_Plots_disturbance_sweden, 
-             Get_disturbance_per_plot("sweden", 50, FUNDIV_tree,
+             Get_disturbance_per_plot("sweden", 15, FUNDIV_tree,
                                       "data/Disturbance")), 
   tar_target(FUNDIV_Plots_disturbance_spain, 
              Get_disturbance_per_plot("spain", 50, FUNDIV_tree,
@@ -259,6 +260,51 @@ tar_target(FUNDIV_tree_withdisturbance,
                  by = "plotcode", all.x = T, all.y = F))
 ```
 
+
+### Data exploration
+
+First, let's look at the survival rate per plot, depending on the type of disturbance. 
+
+```{targets plot-survival-disturbance-FUNDIV}
+tar_target(plotFUNDIV_survival_disturbance,
+           Plot_survival_perdisturbance(FUNDIV_tree_withdisturbance))
+```
+
+```{r figSurvival, fig.height=5, fig.width=5, fig.align='center'}
+tar_read(plotFUNDIV_survival_disturbance)
+ggplot2::ggsave(tar_read(plotFUNDIV_survival_disturbance), 
+       filename = "plots/plotFUNDIV_survival_disturbance.pdf", 
+       height = 12, width = 12, unit = 'cm')  
+```
+
+We can also check the spatial repartition of the different types of disturbance.
+
+```{targets map-FUNDIV-plots-per-disturbance}
+tar_target(map_FUNDIVplots_disturbance, 
+           Map_FUNDIVplots_perDisturbance2(FUNDIV_tree_withdisturbance))
+```
+
+```{r figDisturbanceMap, fig.height=8, fig.width=8, fig.align='center'}
+tar_read(map_FUNDIVplots_disturbance)
+ggplot2::ggsave(tar_read(map_FUNDIVplots_disturbance), 
+       filename = "plots/map_FUNDIVplots_disturbance.jpg", 
+       height = 19, width = 19, unit = 'cm', dpi = 600)  
+```
+
+In France, NFI agents also estimated whether a disturbance occured between the two surveys. The plot below compare disturbance occurences in France between the two surveys based on NFI field estiamtion, or Senf dataset. 
+
+```{targets map-compare-disturbance-NFI-Senf}
+tar_target(Map_NFI_Senf_disturbance_compared, 
+           Map_compare_NFI_Senf_disturbance(FUNDIV_tree_withdisturbance, NFI_plot_remeasure))
+```
+
+```{r figDisturbanceCompared, fig.height=4, fig.width=10, fig.align='center'}
+tar_read(Map_NFI_Senf_disturbance_compared)
+ggplot2::ggsave(tar_read(Map_NFI_Senf_disturbance_compared), 
+       filename = "plots/Map_NFI_Senf_disturbance_compared.jpg", 
+       height = 8, width = 20, unit = 'cm', dpi = 600)  
+```
+
 # Pipeline
 
 If you ran all the `{targets}` chunks in non-interactive mode, then your R scripts are set up to run the pipeline.
@@ -266,15 +312,4 @@ If you ran all the `{targets}` chunks in non-interactive mode, then your R scrip
 ```{r, message=FALSE, results='hide'}
 tar_make()
 ```
-
-
-
-# Output
-
-The `targets` dependency graph helps understanding the steps of the pipeline at a high level.
-
-```{r}
-tar_visnetwork()
-```
-
 
