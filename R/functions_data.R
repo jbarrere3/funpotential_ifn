@@ -559,14 +559,15 @@ library(rgdal)
 library(sf)
 
 
-#' Get disturbance per plot
-#' @description Function to get the disturbanc etype and year from C. Senf for each plot
+#' Get majority disturbance per plot
+#' @description Function to get the disturbance type and year from C. Senf for each plot
+#'              Extract the disturance type and year that dominate (in area) the buffer around each plot center
 #' @param country character: english name of the country, in lower cases (e.g., "france", "spain")
 #' @param buffer numeric: radius of the buffer aroutn plot center to get disturbance value
 #' @param FUNDIV_tree Tree table of FUNDIV data
 #' @param dir Directory where disturbance data are stored
 
-Get_disturbance_per_plot <- function(country, buffer, FUNDIV_tree, dir){
+Get_disturbance_majority_per_plot <- function(country, buffer, FUNDIV_tree, dir){
   print(paste0("Getting disturbance value for ", country))
   
   ## Step 1 - Get raster data
@@ -611,4 +612,134 @@ Get_disturbance_per_plot <- function(country, buffer, FUNDIV_tree, dir){
                                         TRUE ~ NA_real_)) %>% data.frame
   return(out)
 }
+
+
+#' Get disturbance area and year per plot
+#' @description Function to get the type, area and year of each disturbance intercepting a FUNDIV plot
+#' @param country character: english name of the country, in lower cases (e.g., "france", "spain")
+#' @param buffer numeric: radius of the buffer aroutn plot center to get disturbance value
+#' @param FUNDIV_tree Tree table of FUNDIV data
+#' @param dir Directory where disturbance data are stored
+
+Get_disturbance_area_year_per_plot <- function(country, buffer, FUNDIV_tree, dir){
+  print(paste0("Getting disturbance value for ", country))
+  
+  ## Step 1 - Get raster data
+  print("-- Getting disturbance raster")
+  disturbance_type_raster.in <- raster(paste0(dir, "/storm_fire_other_classification_", 
+                                              country, ".tif"))
+  disturbance_year_raster.in <- raster(paste0(dir, "/disturbance_year_1986-2020_", 
+                                              country, ".tif"))
+  
+  ## Step 2 - Create a SPDF with a buffer around each FUNDIV plots
+  print("-- Creating SPDF for FUNDIV plots")
+  # Extract the country code in FUNDIV dataset
+  countrycodes.in <- data.frame(code = c("DE", "ES", "FI", "FR", "SW", "WA"), 
+                                country = c("germany", "spain", "finland", 
+                                            "france", "sweden", "belgium"))
+  this_countrycode.in <- countrycodes.in$code[which(countrycodes.in$country == country)]
+  # Create Spatial Polygon from plot coordinates
+  FUNDIV_plots_polygon.in <-  FUNDIV_tree %>%
+    rename(lon = longitude, lat = latitude) %>%
+    filter(country == this_countrycode.in) %>%
+    dplyr::select(plotcode, lon, lat) %>%
+    distinct 
+  coordinates(FUNDIV_plots_polygon.in) = ~lon+lat
+  proj4string(FUNDIV_plots_polygon.in) <- CRS("+proj=longlat +datum=WGS84")
+  FUNDIV_plots_polygon.in <- spTransform(FUNDIV_plots_polygon.in, 
+                                         crs(disturbance_type_raster.in))
+  # Create a buffer around each plot
+  FUNDIV_plots_polygon.in <- gBuffer(FUNDIV_plots_polygon.in, 
+                                     width = buffer, byid = T)
+  
+  ## Step 3 : Extract raster values within each plot
+  print("-- Extracting raster value within each plot")
+  print("----------Raster 1: disturbance type")
+  disturbance_type_raster.in_extract <- exact_extract(
+    disturbance_type_raster.in, FUNDIV_plots_polygon.in)
+  print("----------Raster 2: disturbance year")
+  disturbance_year_raster.in_extract <- exact_extract(
+    disturbance_year_raster.in, FUNDIV_plots_polygon.in)
+  
+  ## Step 4 : Format the dataset
+  print("-- Formating the data")
+  out <- data.frame(t(sapply(disturbance_type_raster.in_extract, c))) %>%
+    mutate(V = substr(value, start = 3, stop = nchar(value) - 1), 
+           A = substr(coverage_fraction, start = 3, 
+                      stop = nchar(coverage_fraction) - 1)) %>%
+    separate(V, into = paste0("type.", c(1:max(sapply(disturbance_type_raster.in_extract, nrow)))),
+             sep = ", ", fill = "right") %>%
+    separate(A, into = paste0("area.", c(1:max(sapply(disturbance_type_raster.in_extract, nrow)))), 
+             sep = ", ", fill = "right") %>%
+    dplyr::select(-value, -coverage_fraction) %>%
+    cbind(data.frame(t(sapply(disturbance_year_raster.in_extract, c)))) %>%
+    mutate(value = substr(value, start = 3, stop = nchar(value) - 1), 
+           plotcode = FUNDIV_plots_polygon.in@data$plotcode) %>%
+    separate(value, into = paste0("year.", c(1:max(sapply(disturbance_type_raster.in_extract, nrow)))),
+             sep = ", ", fill = "right") %>%
+    dplyr::select(-coverage_fraction) %>%
+    gather(key, value, -plotcode) %>%
+    mutate(info = sub("\\..+", "", key), 
+           cell = as.numeric(sub("....\\.", "", key))) %>%
+    dplyr::select(-key) %>%
+    spread(info, value) %>%
+    filter(type %in% as.character(c(1:3))) %>%
+    mutate(type = as.numeric(type), 
+           year = as.numeric(year)) %>%
+    dplyr::select(-cell) %>%
+    group_by(plotcode) %>%
+    mutate(area.cell = sum(as.numeric(area))) %>%
+    group_by(plotcode, type, year) %>%
+    summarize(coverage = sum(as.numeric(area, na.rm = T))/mean(area.cell, na.rm = T))
+                 
+  return(out)
+}
+
+
+
+#' Add disturbance to FUNDIV
+#' @description Function to sum all disturbances that occured in FUNDIV plots between the two censuses
+#'              Add 3 additional columns to the entry dataset, cumulative % of the area affected by 
+#'              each of the 3 types of disturbance
+#' @param country character: english name of the country, in lower cases (e.g., "france", "spain")
+#' @param FUNDIV_tree Tree table of FUNDIV data
+#' @param disturbance_area_year_per_plot dataframe containging the type, area and year of each 
+#'                                       disturbance intercepting a FUNDIV plot
+#'                                       (computed with the previous function)
+
+add_disturbance_to_FUNDIV <- function(country, FUNDIV_tree, disturbance_area_year_per_plot){
+  # Extract the country code in FUNDIV dataset
+  countrycodes.in <- data.frame(code = c("DE", "ES", "FI", "FR", "SW", "WA"), 
+                                country = c("germany", "spain", "finland", 
+                                            "france", "sweden", "belgium"))
+  this_countrycode.in <- as.character(countrycodes.in$code[which(countrycodes.in$country == country)])
+  
+  # Extract area of each type of disturbance that occured between census 1 and 2
+  FUNDIV.disturbance.in <- FUNDIV_tree %>%
+    filter(country == this_countrycode.in) %>%
+    dplyr::select(plotcode, start_year, yearsbetweensurveys) %>%
+    mutate(end_year = as.numeric(start_year + yearsbetweensurveys), 
+           start_year = as.numeric(start_year)) %>%
+    distinct() %>%
+    merge(disturbance_area_year_per_plot, by = "plotcode", all.y = T) %>%
+    filter(year >= start_year & year <= end_year) %>%
+    mutate(disturbance = case_when(type == 1 ~ "disturbance.other", 
+                                   type == 2 ~ "disturbance.storm", 
+                                   type == 3 ~ "disturbance.fire")) %>%
+    dplyr::select(plotcode, disturbance, coverage) %>%
+    group_by(plotcode, disturbance) %>%
+    summarize(Area = sum(coverage, na.rm = T)) %>%
+    spread(key = disturbance, value = Area, fill = NA) 
+  
+  # Add to the FUNDIV dataset and organize columns to ensure uniformity
+  out <- FUNDIV_tree %>%
+    filter(country == this_countrycode.in) %>%
+    merge(FUNDIV.disturbance.in, by = "plotcode", all.x = T, all.y = F) %>%
+    mutate(disturbance.other = if("disturbance.other" %in% colnames(.)) disturbance.other else NA_real_, 
+           disturbance.storm = if("disturbance.storm" %in% colnames(.)) disturbance.storm else NA_real_,
+           disturbance.fire = if("disturbance.fire" %in% colnames(.)) disturbance.fire else NA_real_) %>%
+    dplyr::select(c(colnames(FUNDIV_tree), "disturbance.storm", "disturbance.fire", "disturbance.other"))
+  return(out)
+}
+
 

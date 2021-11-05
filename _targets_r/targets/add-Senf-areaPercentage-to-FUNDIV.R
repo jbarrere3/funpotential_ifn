@@ -1,0 +1,20 @@
+list(
+  tar_target(FUNDIV_tree_with_diturbance_area_belgium, 
+             add_disturbance_to_FUNDIV("belgium", FUNDIV_tree,
+                                      disturbance_area_year_per_plot_belgium)), 
+  tar_target(FUNDIV_tree_with_diturbance_area_france, 
+             add_disturbance_to_FUNDIV("france", FUNDIV_tree,
+                                      disturbance_area_year_per_plot_france)), 
+  tar_target(FUNDIV_tree_with_diturbance_area_germany, 
+             add_disturbance_to_FUNDIV("germany", FUNDIV_tree,
+                                      disturbance_area_year_per_plot_germany)), 
+  tar_target(FUNDIV_tree_with_diturbance_area_finland, 
+             add_disturbance_to_FUNDIV("finland", FUNDIV_tree,
+                                      disturbance_area_year_per_plot_finland)), 
+  tar_target(FUNDIV_tree_with_diturbance_area_sweden, 
+             add_disturbance_to_FUNDIV("sweden", FUNDIV_tree,
+                                      disturbance_area_year_per_plot_sweden)), 
+  tar_target(FUNDIV_tree_with_diturbance_area_spain, 
+             add_disturbance_to_FUNDIV("spain", FUNDIV_tree,
+                                      disturbance_area_year_per_plot_spain))
+)
