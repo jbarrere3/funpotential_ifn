@@ -743,3 +743,139 @@ add_disturbance_to_FUNDIV <- function(country, FUNDIV_tree, disturbance_area_yea
 }
 
 
+
+
+
+
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 5 - Format to Finnish NFI ####
+#'
+#' @details Group of functions used to 
+#'          format French NFI remeasured 
+#'          data to Finnish NFI format. 
+#' @author Julien Barrere
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#' Format tree level table from FUNDIV to Finnish NFI
+#' @param TreeMort_tree Tree table of NFI data formatted for TreeMort
+#' @param NFI_tree NFI data at tree level for both dead and alive trees
+#' @param NFI_plot_elevation Table linking plot id with elevation asl (m)
+#' @param NFI_plot_remeasure Table containing NFI plot data for remeasured plots
+#' @param NFI_ecological_data Table containing NFI plot ecological data (to get soil information)
+#' @return a tree table of French NFI remeasured data formatted for Finnish NFI
+
+Format_trees_FUNDIV_to_FinnishNFI <- function(FUNDIV_FrenchNFI_tree, NFI_tree, 
+                                              NFI_plot_elevation, NFI_plot_remeasure, 
+                                              NFI_ecological_data){
+  # extract information contained only in the original NFI dataset
+  original.NFI.in <- NFI_tree %>%
+    mutate(tree_id = paste(idp, a, sep = "_")) %>%
+    filter(tree_id %in% FUNDIV_FrenchNFI_tree$treecode2) %>%
+    dplyr::select(tree_id, lib, htot, age)
+  
+  # create a finnish dataset for the first French NFI census
+  out.census1 <- FUNDIV_FrenchNFI_tree %>%
+    rename(tree_species = sp, 
+           sampling_year = start_year, 
+           dbh = dbh1,
+           tree_id = treecode2, 
+           Years_between_samplings = yearsbetweensurveys) %>%
+    mutate(area_identifier1 = sub("_..", "", plotcode)) %>%
+    merge(original.NFI.in, by = "tree_id", all.x = T) %>%
+    merge((NFI_plot_elevation %>% mutate(idp = as.character(idp))), 
+          by.x = "area_identifier1", by.y = "idp", all.x = T, all.y = F) %>%
+    merge((NFI_plot_remeasure %>% mutate(idp = as.character(idp))), 
+          by.x = "area_identifier1", by.y = "idp", all.x = T, all.y = F) %>%
+    merge((NFI_ecological_data %>% mutate(idp = as.character(idp)) %>% dplyr::select(idp, prof2)), 
+          by.x = "area_identifier1", by.y = "idp", all.x = T, all.y = F) %>%
+    mutate(alive_now = 1, 
+           alive_in_the_next_inventory = case_when(treestatus_th %in% c(1, 2) ~ 1, 
+                                                   TRUE ~ 0), 
+           NFI_identifier = "census1", 
+           harvesting_done = case_when((dc5 %in% c(1:4) | prelev5 == 1) ~ 1, 
+                                       TRUE ~ 0), 
+           occurence_of_disturbance = case_when(nincid5 %in% c(1:5) ~ 1, 
+                                                nincid5 == 0 ~ 0), 
+           disturbance_agent = case_when(nincid5 %in% c(1:5) ~ nincid5, 
+                                         TRUE ~ NA_integer_)) %>%
+    rename(canopy_layer = lib, 
+           height = htot, 
+           lat = latitude, 
+           lon = longitude, 
+           elevation = zp, 
+           severity_of_disturbance = incid5,
+           org_layer_thickness = prof2, 
+           statistical_weight = n_ha2, 
+           status = treestatus_th) %>%
+    mutate(area_identifier2 = NA_integer_, area_identifier3 = NA_integer_, 
+           study_plot = NA_integer_, study_plot_id = NA_integer_, 
+           study_plot_part = NA_integer_, height_to_living_canopy = NA_real_, 
+           direction = NA_real_, distance = NA_real_, height_to_dry_branches = NA_real_, 
+           study_plot_type = NA_character_, sampling_day = NA_real_, sampling_month = NA_real_, 
+           sampling_group= NA_character_, site_type = NA_integer_, org_layer_quality = NA_integer_, 
+           soil_type = NA_integer_, grain_size = NA_real_, time_since_harvesting = NA_real_, 
+           tree_cohort = NA_integer_, dominat_tree_species = NA_integer_, 
+           BA_in_plot_surroundings = NA_real_, appearance_of_disturbance = NA_integer_, 
+           time_since_latest_disturbance = NA_real_, x_in_plot = NA_real_, y_in_plot = NA_real_, 
+           bal0 = NA_real_, bal4 = NA_real_, bal0_dbh = NA_real_, bal4_dbh = NA_real_, 
+           bal0_dbh_sq = NA_real_, bal4_dbh_sq = NA_real_, bal0_dbh_sq_rank = NA_real_) %>%
+    dplyr::select(area_identifier1, area_identifier2, area_identifier3, study_plot, study_plot_id, 
+                  study_plot_part, tree_id, alive_now, alive_in_the_next_inventory, tree_species, 
+                  dbh, canopy_layer, height_to_living_canopy, height, age, direction, distance, 
+                  height_to_dry_branches, NFI_identifier, study_plot_type, lat, lon, elevation, 
+                  sampling_day, sampling_month, sampling_year, Years_between_samplings, sampling_group, 
+                  site_type, org_layer_quality, org_layer_thickness, soil_type, grain_size, 
+                  harvesting_done, time_since_harvesting, tree_cohort, dominat_tree_species, 
+                  BA_in_plot_surroundings, occurence_of_disturbance, severity_of_disturbance, 
+                  appearance_of_disturbance, time_since_latest_disturbance, disturbance_agent, 
+                  x_in_plot, y_in_plot, bal0, bal4, bal0_dbh, bal4_dbh, bal0_dbh_sq, 
+                  bal4_dbh_sq, bal0_dbh_sq_rank, statistical_weight, status)
+  
+  out <- FUNDIV_FrenchNFI_tree %>%
+    dplyr::select(treecode2, dbh2) %>%
+    rename(tree_id = treecode2) %>%
+    merge(out.census1, by = "tree_id") %>%
+    mutate(dbh = dbh2, 
+           alive_now = alive_in_the_next_inventory, 
+           alive_in_the_next_inventory = NA_real_, 
+           sampling_year = sampling_year + 5, 
+           height = NA_real_, 
+           age = age+5, 
+           canopy_layer = NA_real_, 
+           NFI_identifier = "census2", 
+           statistical_weight = NA_real_, 
+           status = NA_integer_) %>%
+    dplyr::select(colnames(out.census1)) %>%
+    rbind.data.frame(out.census1) %>%
+    arrange(area_identifier1, tree_id, NFI_identifier)
+  
+}
+
+
+
+
+
+
+#' Format Meta-data Finnish NFI
+#' @details Function to create a metadata table containing important information on Finnish NFI formating
+#' @return a data.table object 
+
+Meta_data_FinnishNFI <- function(){
+  data.frame(Variable = c("canopy_layer", "NFI_identifier", "lat", "lon", "harvesting_done", "severity_of_disturbance",
+                          "disturbance_agent", "org_layer_thickness", "statistical.weight", "status"), 
+             Observation = c("Indicates the proportion of the crown that has direct access to light. 0=0%; 1=1%-66%; 2=67%-100%", 
+                             "Indicates whether the tree was sampled during the first (census1) or second (census2) inventory round", 
+                             "latitude in WGS projection", 
+                             "longitude in WGS projection",
+                             "Did a harvest occured between the two inventory rounds ?",
+                             "% of damage caused by the disturbance, available by class. 0=0%, 1=1-25%, 2=25-50%, 3=50-75%, 4=75-100%", 
+                             "1=Fire, 2=Natural mortality, 3=Landslide, 4=Storm, 5=Other incident",
+                             "Available by class. 0=0-4cm; 1=5-14cm; 2=15-24cm; […]; 8=75-84cm; 9>84cm ", 
+                             "NEW VARIABLE - Number of trees that this sample represents per ha (.ha-1)", 
+                             "NEW VARIABLE - Detailed status of the tree. 1=ingrowth, 2=survivor, 3=dead(harvested), 4=dead(stem present), 5=dead(stem absent)"))
+}
+

@@ -47,8 +47,6 @@ tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
 
 ## Data importation
 
-### NFI data
-
 We start by importing the following data on: 
 
 - NFI plots (`NFI_plot`) and associated ecological data (`NFI_ecological_data`) and elevation (`NFI_plot_elevation`)
@@ -212,6 +210,34 @@ tar_target(FUNDIV_tree,
            (FUNDIV_tree_original %>% 
              filter(country != "FR") %>% 
              rbind(FUNDIV_FrenchNFI_tree)))
+```
+
+
+### Format to Finnish NFI template
+
+The Finnish NFI template is slightly different from the french template or FUNDIV template. Therefore, we need to format them. 
+
+```{targets format-FUNDIV-to-FinnishNFI}
+tar_target(FinnishNFI_French_tree, 
+           Format_trees_FUNDIV_to_FinnishNFI(FUNDIV_FrenchNFI_tree, NFI_tree, 
+                                              NFI_plot_elevation, NFI_plot_remeasure, 
+                                              NFI_ecological_data))
+```
+
+```{r}
+write.table(tar_read(FinnishNFI_French_tree), 
+          file = "data/FinnishNFI/FinnishNFI_French_tree.csv", row.names = F)
+```
+
+We write a metadata table in the FinnishNFI directory to specify important information on some columns. 
+
+```{targets metadata-FinnishNFI}
+tar_target(FinnishNFI_metadata, Meta_data_FinnishNFI())
+```
+
+```{r}
+write.table(tar_read(TreeMort_metadata), 
+          file = "data/FinnishNFI/FinnishNFI_meta_data.csv", row.names = F)
 ```
 
 
@@ -383,6 +409,23 @@ tar_read(Map_areaCoveredPerDisturbance_FUNDIVplots)
 ggplot2::ggsave(tar_read(Map_areaCoveredPerDisturbance_FUNDIVplots), 
        filename = "plots/Map_areaCoveredPerDisturbance_FUNDIVplots.jpg", 
        height = 9, width = 30, unit = 'cm', dpi = 600)  
+```
+
+
+When focusing on france, we can compare the area covered by each disturance to the estimations of disturbance nature and intensity made by NFI agents. 
+
+```{targets Compare-NFI-Senf-disturbance-area}
+tar_target(plot_Compare_NFI_Senf_disturbance_area, 
+           Compare_NFI_Senf_disturbance_area(
+             FUNDIV_tree_with_disturbance_area, 
+             NFI_plot_remeasure))
+```
+
+```{r plot_Compare_NFI_Senf_disturbance_area, fig.height=3, fig.width=10, fig.align='center'}
+tar_read(plot_Compare_NFI_Senf_disturbance_area)
+ggplot2::ggsave(tar_read(plot_Compare_NFI_Senf_disturbance_area), 
+       filename = "plots/plot_Compare_NFI_Senf_disturbance_area.pdf", 
+       height = 9, width = 30, unit = 'cm')  
 ```
 
 # Pipeline

@@ -194,3 +194,64 @@ Map_FUNDIVplots_areaCoveredPerDisturbance <- function(FUNDIV_tree_with_disturban
           strip.background = element_blank(), 
           strip.text = element_text(size = 12, face = "bold")) 
 }
+
+
+
+
+#' Compare disturbance NFI Senf Area
+#' @description Function that plot  relation between the field estimation of 
+#'              disturbance intensity in France, and the percentage of area covered 
+#'              by each type of "Senf" disturbance.
+#' @param FUNDIV_tree_with_disturbance_area FUNDIV tree table with disturbance data
+#' @param NFI_plot_remeasure Table containing NFI plot data for remeasured plots
+
+Compare_NFI_Senf_disturbance_area <- function(FUNDIV_tree_with_disturbance_area, 
+                                              NFI_plot_remeasure){
+  FUNDIV_tree_with_disturbance_area %>%
+    dplyr::select(plotcode, disturbance.storm, 
+                  disturbance.fire, disturbance.other) %>%
+    distinct() %>%
+    merge((NFI_plot_remeasure %>% mutate(plotcode = paste0(idp, "_FR"))), 
+          by = "plotcode", all.x = T, all.y = F) %>%
+    mutate(natureNFI = case_when(nincid5 == 1 ~ "Fire disturbance", 
+                                 nincid5 == 3 ~ "Landslide disturbance", 
+                                 nincid5 == 4 ~ "Storm disturbance", 
+                                 nincid5 %in% c(2, 5) ~ "Other disturbance", 
+                                 TRUE ~ "No disturbance"), 
+           intensityNFI = case_when(incid5 == 0 ~ 0, 
+                                    incid5 == 1 ~ 12.5, 
+                                    incid5 == 2 ~ 37.5, 
+                                    incid5 == 3 ~ 62.5, 
+                                    incid5 == 4 ~ 87.5)) %>%
+    dplyr::select(plotcode, disturbance.storm, 
+                  disturbance.fire, disturbance.other, 
+                  natureNFI, intensityNFI) %>%
+    pivot_longer(c(disturbance.storm, 
+                   disturbance.fire, disturbance.other), 
+                 names_to = "Source", 
+                 values_to = "Disturbance") %>%
+    mutate(Disturbance = ifelse(is.na(Disturbance), 0, Disturbance)) %>%
+    filter(!is.na(intensityNFI)) %>%
+    mutate(Senf_type = sub(".+\\.", "", Source)) %>%
+    group_by(natureNFI, intensityNFI, Senf_type) %>%
+    mutate(label = paste0("(", n(), ")")) %>%
+    ungroup() %>%
+    mutate(Disturbance = 100*Disturbance) %>%
+    filter(natureNFI %in% c("Fire disturbance", "Storm disturbance", 
+                            "Other disturbance")) %>%
+    ggplot(aes(x = intensityNFI, y = Disturbance, colour = Senf_type, 
+               group = interaction(Senf_type, intensityNFI))) + 
+    geom_boxplot(outlier.alpha = 0.5) + 
+    facet_wrap(~ natureNFI) + 
+    geom_text(aes(label = label, y = 110), inherit.aes = T, 
+              colour = 'black', size = 4) + 
+    xlab(expression(atop("Disturbance intensity (%)", 
+                         italic("(NFI field estimation)")))) + 
+    ylab(expression(atop("% plot area covered by disturbance", 
+                         italic("(Senf estimation)")))) +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          strip.background = element_blank(), 
+          strip.text = element_text(size = 12, face = "bold")) + 
+    scale_color_manual(values = c("#D00000", "#38B000", "#0091AD"))
+}
