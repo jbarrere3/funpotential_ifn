@@ -559,69 +559,14 @@ library(rgdal)
 library(sf)
 
 
-#' Get majority disturbance per plot
-#' @description Function to get the disturbance type and year from C. Senf for each plot
-#'              Extract the disturance type and year that dominate (in area) the buffer around each plot center
-#' @param country character: english name of the country, in lower cases (e.g., "france", "spain")
-#' @param buffer numeric: radius of the buffer aroutn plot center to get disturbance value
-#' @param FUNDIV_tree Tree table of FUNDIV data
-#' @param dir Directory where disturbance data are stored
-
-Get_disturbance_majority_per_plot <- function(country, buffer, FUNDIV_tree, dir){
-  print(paste0("Getting disturbance value for ", country))
-  
-  ## Step 1 - Get raster data
-  print("-- Getting disturbance raster")
-  disturbance_type_raster.in <- raster(paste0(dir, "/storm_fire_other_classification_", 
-                                              country, ".tif"))
-  disturbance_year_raster.in <- raster(paste0(dir, "/disturbance_year_1986-2020_", 
-                                              country, ".tif"))
-  
-  ## Step 2 - Create a SPDF with a buffer around each FUNDIV plots
-  print("-- Creating SPDF for FUNDIV plots")
-  # Extract the country code in FUNDIV dataset
-  countrycodes.in <- data.frame(code = c("DE", "ES", "FI", "FR", "SW", "WA"), 
-                                country = c("germany", "spain", "finland", 
-                                            "france", "sweden", "belgium"))
-  this_countrycode.in <- countrycodes.in$code[which(countrycodes.in$country == country)]
-  # Create Spatial Polygon from plot coordinates
-  FUNDIV_plots_polygon.in <-  FUNDIV_tree %>%
-    rename(lon = longitude, lat = latitude) %>%
-    filter(country == this_countrycode.in) %>%
-    dplyr::select(plotcode, lon, lat) %>%
-    distinct 
-  coordinates(FUNDIV_plots_polygon.in) = ~lon+lat
-  proj4string(FUNDIV_plots_polygon.in) <- CRS("+proj=longlat +datum=WGS84")
-  FUNDIV_plots_polygon.in <- spTransform(FUNDIV_plots_polygon.in, 
-                                         crs(disturbance_type_raster.in))
-  # Create a buffer around each plot
-  FUNDIV_plots_polygon.in <- gBuffer(FUNDIV_plots_polygon.in, 
-                                     width = buffer, byid = T)
-  
-  ## Step 3 : Extract raster values within each plot
-  print("-- Extracting raster value within each plot")
-  out <- data.frame(plotcode = FUNDIV_plots_polygon.in@data$plotcode)
-  out$disturbance.type <- exact_extract(disturbance_type_raster.in, 
-                                        FUNDIV_plots_polygon.in, 
-                                        fun = 'majority')
-  out$disturbance.year <- exact_extract(disturbance_year_raster.in, 
-                                        FUNDIV_plots_polygon.in, 
-                                        fun = 'majority')
-  out <- out %>%
-    mutate(disturbance.year = case_when(disturbance.type > 0 ~ disturbance.year, 
-                                        TRUE ~ NA_real_)) %>% data.frame
-  return(out)
-}
-
-
-#' Get disturbance area and year per plot
+#' Get disturbance area and year per plot for a specific country
 #' @description Function to get the type, area and year of each disturbance intercepting a FUNDIV plot
 #' @param country character: english name of the country, in lower cases (e.g., "france", "spain")
 #' @param buffer numeric: radius of the buffer aroutn plot center to get disturbance value
 #' @param FUNDIV_tree Tree table of FUNDIV data
 #' @param dir Directory where disturbance data are stored
 
-Get_disturbance_area_year_per_plot <- function(country, buffer, FUNDIV_tree, dir){
+Get_disturbance_per_plot_per_country <- function(country, buffer, FUNDIV_tree, dir){
   print(paste0("Getting disturbance value for ", country))
   
   ## Step 1 - Get raster data
@@ -697,32 +642,45 @@ Get_disturbance_area_year_per_plot <- function(country, buffer, FUNDIV_tree, dir
 
 
 
+#' Get disturbance area and year per plot for all countries
+#' @description Useful if the same buffer is applied for each country 
+#' @param buffer numeric: radius of the buffer aroutn plot center to get disturbance value
+#' @param FUNDIV_tree Tree table of FUNDIV data
+#' @param dir Directory where disturbance data are stored
+
+Get_disturbance_per_plot <- function(buffer, FUNDIV_tree, dir){
+  countries.in = c("germany", "spain", "finland", 
+                   "france", "sweden", "belgium")
+  for(i in 1:length(countries.in)){
+    print(paste0("Getting disturbance data for ", countries.in[i]))
+    if(i == 1) out <- Get_disturbance_per_plot_per_country(countries.in[i], buffer, FUNDIV_tree, dir)
+    else out <- rbind.data.frame(out, Get_disturbance_per_plot_per_country(countries.in[i], buffer, FUNDIV_tree, dir))
+  }
+  return(out)
+}
+
+
+
+
 #' Add disturbance to FUNDIV
 #' @description Function to sum all disturbances that occured in FUNDIV plots between the two censuses
 #'              Add 3 additional columns to the entry dataset, cumulative % of the area affected by 
 #'              each of the 3 types of disturbance
-#' @param country character: english name of the country, in lower cases (e.g., "france", "spain")
 #' @param FUNDIV_tree Tree table of FUNDIV data
-#' @param disturbance_area_year_per_plot dataframe containging the type, area and year of each 
+#' @param disturbance_per_plot dataframe containging the type, area and year of each 
 #'                                       disturbance intercepting a FUNDIV plot
 #'                                       (computed with the previous function)
 
-add_disturbance_to_FUNDIV <- function(country, FUNDIV_tree, disturbance_area_year_per_plot){
-  # Extract the country code in FUNDIV dataset
-  countrycodes.in <- data.frame(code = c("DE", "ES", "FI", "FR", "SW", "WA"), 
-                                country = c("germany", "spain", "finland", 
-                                            "france", "sweden", "belgium"))
-  this_countrycode.in <- as.character(countrycodes.in$code[which(countrycodes.in$country == country)])
+add_disturbance_to_FUNDIV <- function(FUNDIV_tree, disturbance_per_plot){
   
   # Extract area of each type of disturbance that occured between census 1 and 2
   FUNDIV.disturbance.in <- FUNDIV_tree %>%
-    filter(country == this_countrycode.in) %>%
     dplyr::select(plotcode, start_year, yearsbetweensurveys) %>%
     mutate(end_year = as.numeric(start_year + yearsbetweensurveys), 
            start_year = as.numeric(start_year)) %>%
     distinct() %>%
-    merge(disturbance_area_year_per_plot, by = "plotcode", all.y = T) %>%
-    filter(year >= start_year & year <= end_year) %>%
+    merge(disturbance_per_plot, by = "plotcode", all.y = T) %>%
+    #filter(year >= start_year & year <= end_year) %>%
     mutate(disturbance = case_when(type == 1 ~ "disturbance.other", 
                                    type == 2 ~ "disturbance.storm", 
                                    type == 3 ~ "disturbance.fire")) %>%
@@ -733,7 +691,6 @@ add_disturbance_to_FUNDIV <- function(country, FUNDIV_tree, disturbance_area_yea
   
   # Add to the FUNDIV dataset and organize columns to ensure uniformity
   out <- FUNDIV_tree %>%
-    filter(country == this_countrycode.in) %>%
     merge(FUNDIV.disturbance.in, by = "plotcode", all.x = T, all.y = F) %>%
     mutate(disturbance.other = if("disturbance.other" %in% colnames(.)) disturbance.other else NA_real_, 
            disturbance.storm = if("disturbance.storm" %in% colnames(.)) disturbance.storm else NA_real_,

@@ -1,0 +1,29 @@
+PET data (Monthly mm/day): 
+http://catalogue.ceda.ac.uk/uuid/3df7562727314bab963282e6a0284f24
+
+Use Climate Data Operator (CDO) to manipulate the data. Command line CDO is very efficient at working with netCDF files: https://code.mpimet.mpg.de/projects/cdo/
+
+Crop the files so that we only have Europe 
+
+cdo sellonlatbox,-20,40,30,80 /data/CLIMATE/CRU/PET/cru_ts4.05.1981.1990.pet.dat.nc /data/CLIMATE/CRU/PET/cru_ts4.05.1981.1990.pet.dat_eur.nc  
+
+cdo sellonlatbox,-20,40,30,80 /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/cru_ts3.24.01.1981.1990.pet.dat.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/1981.1990.pet.dat_eur.nc  
+
+cdo sellonlatbox,-20,40,30,80 /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/cru_ts3.24.01.1991.2000.pet.dat.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/1991.2000.pet.dat_eur.nc  
+
+cdo sellonlatbox,-20,40,30,80 /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/cru_ts3.24.01.2011.2015.pet.dat.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/2011.2015.pet.dat_eur.nc  
+
+Merge the time steps 
+cdo mergetime /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/1981.1990.pet.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/1991.2000.pet.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/2001.2010.pet.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/2011.2015.pet.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/PET/v3.24.01/1981.2015.pet.dat_eur.nc
+
+-- multiple by the days in the month, so that PET is mm/month
+cdo muldpm /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet_monthly.dat_eur.nc 
+
+-- add monthly values, so that PET is mm/year for each year 
+cdo yearsum /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet_monthly.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet_yearly.dat_eur.nc
+
+-- select just the summer months for the summer water stress estimation
+cdo selmon,6/8 /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet_monthly.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet_summer.months.dat_eur.nc
+
+-- add monthly values, so that PET is mm of the three summer months for each year
+cdo yearsum /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet_summer.months.dat_eur.nc /Volumes/FREESIAS/Data/Spatial/Climate/CRU/v3.24.01/PET/1981.2015.pet_summer.yearly.dat_eur.nc

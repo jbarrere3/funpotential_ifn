@@ -43,9 +43,8 @@ tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
                             "rnaturalearthdata", "ggspatial"))
 ```
 
-# Targets
 
-## Data importation
+# Importation of french NFI data
 
 We start by importing the following data on: 
 
@@ -82,9 +81,9 @@ list(
 ```
 
 
-## Data formating - TreeMort project
+# Formating of French NFI data for the TreeMort project
 
-### Species data
+## Species data
 
 We start by importing :
 
@@ -111,7 +110,7 @@ write.table(tar_read(TreeMort_species),
 
 
 
-### Trees data
+## Trees data
 
 We start by formatting the table of the first (census 1) and second (census 2) measurements (both dead and alive trees).
 
@@ -136,7 +135,7 @@ write.table(tar_read(TreeMort_tree),
           file = "data/TreeMort/tree_data.csv", row.names = F)
 ```
 
-### Plots data
+## Plots data
 
 We format the `NFI_plot` table to fit into TreeMort template, and we write the formated table (`TreeMort_plot`) in the TreeMort directory.
 
@@ -152,7 +151,7 @@ write.table(tar_read(TreeMort_plot),
           file = "data/TreeMort/plot_data.csv", row.names = F)
 ```
 
-### Census data
+## Census data
 
 First, we need to create a management variable describing the occurence of a cut in the last 5 years for each census. 
 
@@ -171,7 +170,7 @@ write.table(tar_read(TreeMort_census),
           file = "data/TreeMort/census_data.csv", row.names = F)
 ```
 
-### Meta data
+## Meta data
 
 We write a metadata table in the TreeMort directory to specify important information on some columns. 
 
@@ -184,9 +183,9 @@ write.table(tar_read(TreeMort_metadata),
           file = "data/TreeMort/meta_data.csv", row.names = F)
 ```
 
-## FUNDIV dataset
+# Importation and formating of FUNDIV data
 
-### Include NFI remeasured data in FUNDIV dataset
+## Importation
 
 We start by importing the tree (`FUNDIV_tree_original`) and plot (`FUNDIV_plot`) datatables of FUNDIV. 
 ```{targets import-FUNDIV}
@@ -196,6 +195,7 @@ list(
 )
 ```
 
+## Inclusion of French NFI remeasured data
 
 Using `FUNDIV_plot` dataset, we can format the NFI trees that were measured twice to FUNDIV template. 
 ```{targets format-trees-TreeMort-to-FUNDIV}
@@ -213,9 +213,9 @@ tar_target(FUNDIV_tree,
 ```
 
 
-### Format to Finnish NFI template
+## Formating to Finnish NFI template
 
-The Finnish NFI template is slightly different from the french template or FUNDIV template. Therefore, we need to format them. 
+The Finnish NFI template is slightly different from the French NFI template or FUNDIV template. Therefore, we need to format them. 
 
 ```{targets format-FUNDIV-to-FinnishNFI}
 tar_target(FinnishNFI_French_tree, 
@@ -241,167 +241,38 @@ write.table(tar_read(TreeMort_metadata),
 ```
 
 
-### Import disturbance data
+## Inclusion of Senf disturbance data in FUNDIV
 
-#### Majority approach
-
-For each country, we create a dataset containing the dusturbance type ([Senf & Seidl, 2021a](https://doi.org/10.1111/gcb.15679)) and year ([Senf & Seidl, 2021b](https://www.nature.com/articles/s41893-020-00609-y)) that dominates in area a buffer of 15m around each FUNDIV plot center (if any disturbance occured). 
-
-```{targets import-disturbance-Senf-majority}
-list(
-  tar_target(FUNDIV_Plots_disturbance_belgium, 
-             Get_disturbance_majority_per_plot("belgium", 15, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(FUNDIV_Plots_disturbance_france, 
-             Get_disturbance_majority_per_plot("france", 15, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(FUNDIV_Plots_disturbance_germany, 
-             Get_disturbance_majority_per_plot("germany", 15, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(FUNDIV_Plots_disturbance_finland, 
-             Get_disturbance_majority_per_plot("finland", 15, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(FUNDIV_Plots_disturbance_sweden, 
-             Get_disturbance_majority_per_plot("sweden", 15, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(FUNDIV_Plots_disturbance_spain, 
-             Get_disturbance_majority_per_plot("spain", 15, FUNDIV_tree,
-                                      "data/Disturbance"))
-)
-```
-
-We merge these datasets to have disturbance data for all FUNDIV plots. 
-
-```{targets merge-disturbance-plots-majority}
-tar_target(FUNDIV_Plots_disturbance, 
-           rbind.data.frame(FUNDIV_Plots_disturbance_belgium,
-                            FUNDIV_Plots_disturbance_france, 
-                            FUNDIV_Plots_disturbance_germany, 
-                            FUNDIV_Plots_disturbance_finland, 
-                            FUNDIV_Plots_disturbance_sweden, 
-                            FUNDIV_Plots_disturbance_spain))
-```
-
-```{targets Add-disturbance-to-FUNDIV-tree}
-tar_target(FUNDIV_tree_withdisturbance, 
-           merge(FUNDIV_tree, FUNDIV_Plots_disturbance, 
-                 by = "plotcode", all.x = T, all.y = F))
-```
-
-#### Area percentage approach
-
-We use an alternative, more precise approach. For each plot, we extract the percentage of the buffer area covered by each type of disturbance that occured between 1986 and 2020.
+We create a circular buffer around each FUNDIV plot center, and we associate each plot to the percentage of the buffer area covered by each type of disturbance ([Senf & Seidl, 2021a](https://doi.org/10.1111/gcb.15679)) that occured between 1986 and 2020. We use three size of circular buffer: 15m, 100m and 200m: 
 
 ```{targets import-disturbance-Senf-areaPercentage}
-list(
-  tar_target(disturbance_area_year_per_plot_belgium, 
-             Get_disturbance_area_year_per_plot("belgium", 100, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(disturbance_area_year_per_plot_france, 
-             Get_disturbance_area_year_per_plot("france", 100, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(disturbance_area_year_per_plot_germany, 
-             Get_disturbance_area_year_per_plot("germany", 100, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(disturbance_area_year_per_plot_finland, 
-             Get_disturbance_area_year_per_plot("finland", 100, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(disturbance_area_year_per_plot_sweden, 
-             Get_disturbance_area_year_per_plot("sweden", 100, FUNDIV_tree,
-                                      "data/Disturbance")), 
-  tar_target(disturbance_area_year_per_plot_spain, 
-             Get_disturbance_area_year_per_plot("spain", 100, FUNDIV_tree,
-                                      "data/Disturbance"))
-)
+list(tar_target(disturbance_per_plot_15m, 
+           Get_disturbance_per_plot(15, FUNDIV_tree, "data/Disturbance")), 
+     tar_target(disturbance_per_plot_100m, 
+           Get_disturbance_per_plot(100, FUNDIV_tree, "data/Disturbance")), 
+     tar_target(disturbance_per_plot_200m, 
+           Get_disturbance_per_plot(200, FUNDIV_tree, "data/Disturbance")))
 ```
 
-Secondly, we add this information in the FUNDIV database by keeping only the distubrances that occured between the two census.
+Secondly, we add this information in the FUNDIV database.
 
 ```{targets add-Senf-areaPercentage-to-FUNDIV}
-list(
-  tar_target(FUNDIV_tree_with_diturbance_area_belgium, 
-             add_disturbance_to_FUNDIV("belgium", FUNDIV_tree,
-                                      disturbance_area_year_per_plot_belgium)), 
-  tar_target(FUNDIV_tree_with_diturbance_area_france, 
-             add_disturbance_to_FUNDIV("france", FUNDIV_tree,
-                                      disturbance_area_year_per_plot_france)), 
-  tar_target(FUNDIV_tree_with_diturbance_area_germany, 
-             add_disturbance_to_FUNDIV("germany", FUNDIV_tree,
-                                      disturbance_area_year_per_plot_germany)), 
-  tar_target(FUNDIV_tree_with_diturbance_area_finland, 
-             add_disturbance_to_FUNDIV("finland", FUNDIV_tree,
-                                      disturbance_area_year_per_plot_finland)), 
-  tar_target(FUNDIV_tree_with_diturbance_area_sweden, 
-             add_disturbance_to_FUNDIV("sweden", FUNDIV_tree,
-                                      disturbance_area_year_per_plot_sweden)), 
-  tar_target(FUNDIV_tree_with_diturbance_area_spain, 
-             add_disturbance_to_FUNDIV("spain", FUNDIV_tree,
-                                      disturbance_area_year_per_plot_spain))
-)
-```
-
-Lastly, we merge the datasets of each country to have the disturbance "with area" for all FUNDIV countries. 
-
-```{targets merge-FUNDIV-with-disturbance-area}
-tar_target(FUNDIV_tree_with_disturbance_area, 
-           rbind.data.frame(FUNDIV_tree_with_diturbance_area_belgium,
-                            FUNDIV_tree_with_diturbance_area_france, 
-                            FUNDIV_tree_with_diturbance_area_germany, 
-                            FUNDIV_tree_with_diturbance_area_finland, 
-                            FUNDIV_tree_with_diturbance_area_sweden, 
-                            FUNDIV_tree_with_diturbance_area_spain))
+list(tar_target(FUNDIV_tree_disturbance15m, 
+           add_disturbance_to_FUNDIV(FUNDIV_tree, disturbance_per_plot_15m)), 
+     tar_target(FUNDIV_tree_disturbance100m, 
+           add_disturbance_to_FUNDIV(FUNDIV_tree, disturbance_per_plot_100m)), 
+     tar_target(FUNDIV_tree_disturbance200m, 
+           add_disturbance_to_FUNDIV(FUNDIV_tree, disturbance_per_plot_200m)))
 ```
 
 
-### Data exploration
+# Data exploration - Disturbance data and FUNDIV
 
-First, let's look at the survival rate per plot, depending on the type of disturbance. 
-
-```{targets plot-survival-disturbance-FUNDIV}
-tar_target(plotFUNDIV_survival_disturbance,
-           Plot_survival_perdisturbance(FUNDIV_tree_withdisturbance))
-```
-
-```{r figSurvival, fig.height=5, fig.width=5, fig.align='center'}
-tar_read(plotFUNDIV_survival_disturbance)
-ggplot2::ggsave(tar_read(plotFUNDIV_survival_disturbance), 
-       filename = "plots/plotFUNDIV_survival_disturbance.pdf", 
-       height = 12, width = 12, unit = 'cm')  
-```
-
-We can also check the spatial repartition of the different types of disturbance.
-
-```{targets map-FUNDIV-plots-per-disturbance}
-tar_target(map_FUNDIVplots_disturbance, 
-           Map_FUNDIVplots_perDisturbance(FUNDIV_tree_withdisturbance))
-```
-
-```{r figDisturbanceMap, fig.height=8, fig.width=8, fig.align='center'}
-tar_read(map_FUNDIVplots_disturbance)
-ggplot2::ggsave(tar_read(map_FUNDIVplots_disturbance), 
-       filename = "plots/map_FUNDIVplots_disturbance.jpg", 
-       height = 19, width = 19, unit = 'cm', dpi = 600)  
-```
-
-In France, NFI agents also estimated whether a disturbance occured between the two surveys. The plot below compare disturbance occurences in France between the two surveys based on NFI field estiamtion, or Senf dataset. 
-
-```{targets map-compare-disturbance-NFI-Senf}
-tar_target(Map_NFI_Senf_disturbance_compared, 
-           Map_compare_NFI_Senf_disturbance(FUNDIV_tree_withdisturbance, NFI_plot_remeasure))
-```
-
-```{r figDisturbanceCompared, fig.height=4, fig.width=10, fig.align='center'}
-tar_read(Map_NFI_Senf_disturbance_compared)
-ggplot2::ggsave(tar_read(Map_NFI_Senf_disturbance_compared), 
-       filename = "plots/Map_NFI_Senf_disturbance_compared.jpg", 
-       height = 8, width = 20, unit = 'cm', dpi = 600)  
-```
-
-When enlarging the buffer around plot center to 100m-radius, we can plot the percentage of the buffer around each plots covered by the three types of disturbance. 
+We plot the percentage of the buffer around each plot covered by the three types of disturbance. 
 
 ```{targets map-area-covered-by-disturbance}
 tar_target(Map_areaCoveredPerDisturbance_FUNDIVplots, 
-           Map_FUNDIVplots_areaCoveredPerDisturbance(FUNDIV_tree_with_disturbance_area))
+           Map_FUNDIVplots_areaCoveredPerDisturbance(FUNDIV_tree_disturbance100m))
 ```
 
 ```{r figAreaCoveredPerDisturbance, fig.height=3, fig.width=10, fig.align='center'}
@@ -417,7 +288,7 @@ When focusing on france, we can compare the area covered by each disturance to t
 ```{targets Compare-NFI-Senf-disturbance-area}
 tar_target(plot_Compare_NFI_Senf_disturbance_area, 
            Compare_NFI_Senf_disturbance_area(
-             FUNDIV_tree_with_disturbance_area, 
+             FUNDIV_tree_disturbance100m, 
              NFI_plot_remeasure))
 ```
 
@@ -428,9 +299,62 @@ ggplot2::ggsave(tar_read(plot_Compare_NFI_Senf_disturbance_area),
        height = 9, width = 30, unit = 'cm')  
 ```
 
-# Pipeline
+In the plot below, we compute from the dataset `disturbance_per_plot_200m` the percentage of the buffer area affected by each disturbance for each year and each country, and show this temporal and spatial variability. We also added the year of first and last measurement for each country (vertical dotted black lines). 
 
-If you ran all the `{targets}` chunks in non-interactive mode, then your R scripts are set up to run the pipeline.
+```{targets plot-prevalence-per-country-per-year}
+tar_target(plot_prevalence_per_country_per_year, 
+           plot_annualPrevalence(disturbance_per_plot_200m, FUNDIV_tree))
+```
+
+```{r save-plot-prevalence-per-country-per-year, fig.height=5, fig.width=10, fig.align='center'}
+tar_read(plot_prevalence_per_country_per_year)
+ggplot2::ggsave(tar_read(plot_prevalence_per_country_per_year), 
+       filename = "plots/plot_prevalence_per_country_per_year.pdf", 
+       height = 15, width = 30, unit = 'cm')  
+```
+
+To make the plots below, we computed the mortality rate of each plot (harvested trees and recruits were removed), converted it into a qualitative variable and we computed for each class the percentage of area covered by each type of disturbance. We make one plot per buffer size.  
+
+```{targets plot-disturbedArea-perMortalityRate}
+list(
+  tar_target(plot_disturbedArea_perMortalityRate_15m, 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance15m, 
+                                                 "Buffer = 15m radius")), 
+  tar_target(plot_disturbedArea_perMortalityRate_100m, 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance100m, 
+                                                 "Buffer = 100m radius")), 
+  tar_target(plot_disturbedArea_perMortalityRate_200m, 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
+                                                 "Buffer = 200m radius"))
+)
+```
+
+```{r save-plot-disturbedArea-perMortalityRate-15m, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_disturbedArea_perMortalityRate_15m)
+ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_15m), 
+       filename = "plots/plot_disturbedArea_perMortalityRate_15m.pdf", 
+       height = 12, width = 20, unit = 'cm')  
+```
+
+
+```{r save-plot-disturbedArea-perMortalityRate-100m, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_disturbedArea_perMortalityRate_100m)
+ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_100m), 
+       filename = "plots/plot_disturbedArea_perMortalityRate_100m.pdf", 
+       height = 12, width = 20, unit = 'cm')  
+```
+
+
+```{r save-plot-disturbedArea-perMortalityRate-200m, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_disturbedArea_perMortalityRate_200m)
+ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_200m), 
+       filename = "plots/plot_disturbedArea_perMortalityRate_200m.pdf", 
+       height = 12, width = 20, unit = 'cm')  
+```
+
+
+
+# Pipeline
 
 ```{r, message=FALSE, results='hide'}
 tar_make()

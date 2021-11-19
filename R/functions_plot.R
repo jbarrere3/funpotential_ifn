@@ -19,152 +19,14 @@
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-#' Plot survival rate disturbance
-#'
-#' @description Function to plot the survival rate at plot level for each
-#'              type of disturbance (fire, storm or other)
-#' @param FUNDIV_tree_withdisturbance FUNDIV tree table with disturbance data
-
-Plot_survival_perdisturbance <- function(FUNDIV_tree_withdisturbance){
-  FUNDIV_tree_withdisturbance.in <- FUNDIV_tree_withdisturbance %>%
-    mutate(Disturbance = case_when(disturbance.type == 0 ~ "No disturbance", 
-                                   disturbance.type == 1 ~ "Other disturbance", 
-                                   disturbance.type == 2 ~ "Storm disturbance", 
-                                   disturbance.type == 3 ~ "Fire disturbance"), 
-           tree.alive = case_when(treestatus_th %in% c(1, 2) ~ 1, 
-                                  TRUE ~ 0)) %>%
-    mutate(Disturbance = case_when((disturbance.year >= start_year & disturbance.year <= start_year+yearsbetweensurveys) ~ Disturbance, 
-                                   TRUE ~ "No disturbance")) %>%
-    mutate(Disturbance = factor(Disturbance, 
-                                levels = c("No disturbance", "Other disturbance", 
-                                           "Storm disturbance", "Fire disturbance"))) %>%
-    group_by(plotcode, Disturbance) %>%
-    summarize(proportion.tree.alive = sum(tree.alive)/n()*100)
-  
-  label.in <- FUNDIV_tree_withdisturbance.in %>%
-    group_by(Disturbance) %>%
-    summarize(n = n()) %>%
-    mutate(label = paste0("n = ", n), 
-           x = 50, y = 0.8)
-  
-  FUNDIV_tree_withdisturbance.in %>%
-    ggplot(aes(x = proportion.tree.alive)) + 
-    geom_histogram(aes(y = stat(density) * 5), 
-                   binwidth = 5, fill = '#AE2012', color = 'black') + 
-    facet_wrap(~ Disturbance) + 
-    xlab("Survival percentage") + ylab("Frequency") + 
-    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
-          panel.grid = element_blank(),
-          strip.background = element_blank()) + 
-    geom_text(data = label.in, 
-              mapping = aes(x = x, y = y, label = label), 
-              size = 3.5, fontface = 'italic')
-}
-
-#' Map Disturbance FUNDIV plots
-#' @description Create 4 maps of FUNDIV plots, one per type fo disturbance
-#' @param FUNDIV_tree_withdisturbance FUNDIV tree table with disturbance data
-
-Map_FUNDIVplots_perDisturbance <- function(FUNDIV_tree_withdisturbance){
-  # Create sf object from FUNDIV_tree_withdisturbance
-  FUNDIV_tree_withdisturbance.in <- FUNDIV_tree_withdisturbance %>%
-  mutate(Disturbance = case_when(disturbance.type == 0 ~ "No disturbance", 
-                                 disturbance.type == 1 ~ "Other disturbance", 
-                                 disturbance.type == 2 ~ "Storm disturbance", 
-                                 disturbance.type == 3 ~ "Fire disturbance")) %>%
-  mutate(Disturbance = factor(Disturbance, 
-                              levels = c("No disturbance", "Storm disturbance", 
-                                         "Fire disturbance", "Other disturbance"))) %>%
-  select(plotcode, longitude, latitude, Disturbance) %>%
-  distinct %>%
-  st_as_sf(coords = c("longitude", "latitude"), crs = 4326, agr = "constant")
-  
-  # Map the generated sf object
-  ne_countries(scale = "medium", returnclass = "sf") %>%
-    ggplot() +
-    geom_sf(fill = "#E9ECEF", show.legend = F) +
-    geom_sf(data = FUNDIV_tree_withdisturbance.in, 
-            size = 0.2, shape = 20, aes(color = Disturbance), 
-            show.legend = "point")+
-    scale_color_manual(values = c("#ADB5BD", "#0091AD", "#D00000", "#38B000")) +
-    coord_sf(expand = FALSE, xlim = c(-25, 40), ylim = c(35, 72)) + 
-    annotation_scale(location = "bl", width_hint = 0.13) +
-    annotation_north_arrow(location = "tl", which_north = "true", 
-                           pad_x = unit(0.35, "in"), pad_y = unit(0.1, "in"),
-                           style = north_arrow_fancy_orienteering) +
-    facet_wrap(~ Disturbance) +
-    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
-          panel.grid = element_line(colour = 'lightgray', linetype = "dashed"),
-          legend.position = "none", 
-          strip.background = element_blank(), 
-          strip.text = element_text(size = 12, face = "bold"))
-}
-
-
-#' Compare disturbance NFI Senf
-#' @description Function that map the disturbance that occured in France, between the two surveys
-#'              with two different sources: Senf and field estimation by NFI agents
-#' @param FUNDIV_tree_withdisturbance FUNDIV tree table with disturbance data
-#' @param NFI_plot_remeasure Table containing NFI plot data for remeasured plots
-
-Map_compare_NFI_Senf_disturbance <- function(FUNDIV_tree_withdisturbance, NFI_plot_remeasure){
-  # Format data
-  data.in <- FUNDIV_tree_withdisturbance %>%
-    filter(country == "FR") %>%
-    mutate(Senf = case_when(disturbance.type == 0 ~ "No disturbance", 
-                            disturbance.type == 1 ~ "Other disturbance", 
-                            disturbance.type == 2 ~ "Storm disturbance", 
-                            disturbance.type == 3 ~ "Fire disturbance")) %>%
-    mutate(Senf = case_when((disturbance.year >= start_year & disturbance.year <= start_year+yearsbetweensurveys) ~ Senf, 
-                            TRUE ~ "No disturbance")) %>%
-    select(plotcode, longitude, latitude, Senf) %>%
-    distinct %>%
-    merge((NFI_plot_remeasure %>% mutate(plotcode = paste0(idp, "_FR"))), 
-          by = "plotcode", all.x = T, all.y = F) %>%
-    mutate(FrenchNFI = case_when(nincid5 == 1 ~ "Fire disturbance", 
-                                 nincid5 == 3 ~ "Landslide disturbance", 
-                                 nincid5 == 4 ~ "Storm disturbance", 
-                                 nincid5 %in% c(2, 5) ~ "Other disturbance", 
-                                 TRUE ~ "No disturbance")) %>%
-    pivot_longer(c(FrenchNFI, Senf), names_to = "Source", values_to = "Disturbance") %>%
-    filter(Disturbance != "No disturbance") %>%
-    mutate(Disturbance = factor(Disturbance, 
-                                levels = c("Storm disturbance", "Fire disturbance", 
-                                           "Other disturbance", "Landslide disturbance"))) %>%
-    select(plotcode, longitude, latitude, Source, Disturbance) %>%
-    st_as_sf(coords = c("longitude", "latitude"), crs = 4326, agr = "constant")
-  
-  # Plot data
-  ne_countries(scale = "medium", returnclass = "sf") %>%
-    ggplot() +
-    geom_sf(fill = "white", show.legend = F) +
-    geom_sf(data = data.in, 
-            size = 2, shape = 21, aes(fill = Disturbance), 
-            color = 'black', show.legend = "point")+
-    scale_fill_manual(values = c("#0091AD", "#D00000", "#38B000", "#B5179E")) +
-    coord_sf(expand = FALSE, xlim = c(-6, 9), ylim = c(42, 52)) + 
-    annotation_scale(location = "br", width_hint = 0.2) +
-    annotation_north_arrow(location = "tl", which_north = "true", 
-                           pad_x = unit(0.22, "in"), pad_y = unit(0.1, "in"),
-                           style = north_arrow_fancy_orienteering) +
-    facet_wrap(~ Source) +
-    theme(panel.background = element_rect(color = 'black', fill = 'aliceblue'), 
-          panel.grid = element_line(colour = 'lightgray', linetype = "dashed"),
-          legend.title = element_blank(), 
-          strip.background = element_blank(), 
-          strip.text = element_text(size = 12, face = "bold"))
-}
-
-
-
 #' Map  FUNDIV plots area covered per disturbance
 #' @description Create 3 maps of FUNDIV plots, one per type of disturbance
-#' @param FUNDIV_tree_with_disturbance_area FUNDIV tree table with one column per disturbance type
+#' @param FUNDIV_tree_with_disturbance FUNDIV tree table with one column per disturbance type
 #'                                          Generated by function add_disturbance_to_FUNDIV
 
-Map_FUNDIVplots_areaCoveredPerDisturbance <- function(FUNDIV_tree_with_disturbance_area){
+Map_FUNDIVplots_areaCoveredPerDisturbance <- function(FUNDIV_tree_with_disturbance){
   # Create sf object from FUNDIV_tree_withdisturbance
-  FUNDIV_tree_withdisturbance.in <- FUNDIV_tree_with_disturbance_area %>%
+  FUNDIV_tree_withdisturbance.in <- FUNDIV_tree_with_disturbance %>%
     dplyr::select(plotcode, longitude, latitude, disturbance.storm, disturbance.fire, disturbance.other) %>%
     rename(Storm = disturbance.storm, Fire = disturbance.fire, Other = disturbance.other) %>%
     distinct %>%
@@ -202,12 +64,12 @@ Map_FUNDIVplots_areaCoveredPerDisturbance <- function(FUNDIV_tree_with_disturban
 #' @description Function that plot  relation between the field estimation of 
 #'              disturbance intensity in France, and the percentage of area covered 
 #'              by each type of "Senf" disturbance.
-#' @param FUNDIV_tree_with_disturbance_area FUNDIV tree table with disturbance data
+#' @param FUNDIV_tree_with_disturbance FUNDIV tree table with disturbance data
 #' @param NFI_plot_remeasure Table containing NFI plot data for remeasured plots
 
-Compare_NFI_Senf_disturbance_area <- function(FUNDIV_tree_with_disturbance_area, 
+Compare_NFI_Senf_disturbance_area <- function(FUNDIV_tree_with_disturbance, 
                                               NFI_plot_remeasure){
-  FUNDIV_tree_with_disturbance_area %>%
+  FUNDIV_tree_with_disturbance %>%
     dplyr::select(plotcode, disturbance.storm, 
                   disturbance.fire, disturbance.other) %>%
     distinct() %>%
@@ -253,5 +115,143 @@ Compare_NFI_Senf_disturbance_area <- function(FUNDIV_tree_with_disturbance_area,
           panel.grid = element_blank(),
           strip.background = element_blank(), 
           strip.text = element_text(size = 12, face = "bold")) + 
-    scale_color_manual(values = c("#D00000", "#38B000", "#0091AD"))
+    scale_color_manual(values = c("#F4A259", "#8CB369", "#5B8E7D"))
+}
+
+
+
+#' Plot disturbed area per mortality rate
+#' @description Function that classify NFI plots per mortality rate, and that plot
+#'              for each mortality rate class the % of area covered by each type 
+#'              of "Senf" disturbance.
+#' @param FUNDIV_tree_disturbance FUNDIV tree table with disturbance data
+#' @param title.in Character : title of the plot (useful to specify the buffer)
+
+plot_areaDisturbance_perMortalityRate <- function(FUNDIV_tree_disturbance, title.in){
+  FUNDIV_tree_disturbance %>%
+    # Remove harvested trees, recruits, and unknown cause of death
+    filter(treestatus_th %in% c(2, 4)) %>%
+    # Compute mortality per plot
+    mutate(death.count = case_when(treestatus_th == 4 ~ 1, TRUE ~ 0)) %>%
+    dplyr::select(plotcode, death.count, disturbance.fire, disturbance.storm, disturbance.other) %>%
+    replace_na(replace = list(disturbance.fire = 0, 
+                              disturbance.storm = 0, 
+                              disturbance.other = 0)) %>%
+    group_by(plotcode) %>%
+    summarize(death.prop = round(sum(death.count)/n()*100, digits = 0), 
+              fire.prop = sum(disturbance.fire)/n()*100, 
+              storm.prop = sum(disturbance.storm)/n()*100, 
+              other.prop = sum(disturbance.other)/n()*100) %>%
+    mutate(death.prop.category = case_when(death.prop == 0 ~ "0%", 
+                                           death.prop %in% c(1:10) ~ "1 - 10%", 
+                                           death.prop %in% c(11:20) ~ "11 - 20%", 
+                                           death.prop %in% c(21:30) ~ "21 - 30%", 
+                                           death.prop %in% c(31:40) ~ "31 - 40%", 
+                                           death.prop %in% c(41:50) ~ "41 - 50%", 
+                                           death.prop %in% c(51:60) ~ "51 - 60%", 
+                                           death.prop %in% c(61:70) ~ "61 - 70%", 
+                                           death.prop %in% c(71:80) ~ "71 - 80%", 
+                                           death.prop %in% c(81:90) ~ "81 - 90%", 
+                                           death.prop %in% c(91:100) ~ "91 - 100%"), 
+           undisturbed.prop = 100 - (fire.prop + storm.prop + other.prop)) %>%
+    group_by(death.prop.category) %>%
+    summarise(Fire = sum(fire.prop)/n(), 
+              Storm = sum(storm.prop)/n(), 
+              Other = sum(other.prop)/n(), 
+              Undisturbed = sum(undisturbed.prop)/n(), 
+              label = paste0("(", n(), ")"), 
+              label.pos = 105) %>%
+    gather(key = "Disturbance", value = "Area.percentage", "Fire", "Storm", "Other", "Undisturbed") %>%
+    ggplot(aes(x = death.prop.category, y = Area.percentage, fill = Disturbance)) + 
+    geom_bar(stat = "identity") + 
+    geom_text(aes(y = label.pos, label= label), vjust=-0.2, size=3.5, inherit.aes = T) + 
+    scale_fill_manual(values = c("#F4A259", "#8CB369", "#5B8E7D", "#E0E1DD")) +
+    xlab("Mortality rate (plot level)") + ylab("% of the area affected") +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          axis.text.y = element_text(size = 11), 
+          axis.text.x = element_text(size = 10, angle = 30, vjust = 1, hjust = 1), 
+          axis.title = element_text(size = 13), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_blank()) + 
+    ggtitle(title.in)
+}
+
+
+
+#' Plot Annual prevalence of each disturbance per country
+#' @description Function that compute the percentage of all plot buffer area 
+#'              affected by each disturbance, and that plot this annual prevalence 
+#'              per country and per year
+#' @param disturbance_per_plot dataframe containging the type, area and year of each 
+#'                                       disturbance intercepting a FUNDIV plot buffer
+#' @param FUNDIV_tree Tree table of FUNDIV data
+
+plot_annualPrevalence <- function(disturbance_per_plot, FUNDIV_tree){
+  disturbance.in <- disturbance_per_plot %>%
+    merge((FUNDIV_tree %>% dplyr::select(plotcode, country) %>% distinct()), 
+          by = "plotcode", all.x = T, all.y = F) %>%
+    mutate(disturbance.type = case_when(type == 3 ~ "Fire", 
+                                        type == 2 ~ "Storm", 
+                                        type == 1 ~ "Other")) %>%
+    group_by(country, year, disturbance.type) %>%
+    summarise(Area = sum(coverage)) %>%
+    filter(year %in% c(1986:2020)) %>%
+    mutate(id = paste(country, year, disturbance.type, sep = "_")) %>%
+    ungroup() %>%
+    dplyr::select(id, Area)
+  
+  countryLevelInfo.in <- FUNDIV_tree %>%
+    mutate(end_year = start_year + yearsbetweensurveys) %>%
+    dplyr::select(plotcode, country, start_year, end_year) %>%
+    distinct() %>%
+    group_by(country) %>%
+    summarise(n.plot = n(), 
+              min.year = min(start_year, na.rm = T), 
+              max.year = max(end_year, na.rm = T))
+  
+  out.data <- expand.grid(country = c("DE", "ES", "FI", "FR", "SW", "WA"), 
+                               year = c(1986:2020), 
+                               disturbance.type = c("Fire", "Other", "Storm")) %>%
+    mutate(id = paste(country, year, disturbance.type, sep = "_")) %>%
+    merge(disturbance.in, by = "id", all.x = T) %>%
+    replace_na(list(Area = 0)) %>%
+    merge((countryLevelInfo.in %>% dplyr::select(country, n.plot)), 
+          by = "country", all.x = T) %>%
+    mutate(Prevalence = round(Area/n.plot*100, digits = 4), 
+           Country = case_when(country == "DE" ~ "Germany", 
+                               country == "ES" ~ "Spain", 
+                               country == "FI" ~ "Finland", 
+                               country == "FR" ~ "France", 
+                               country == "SW" ~ "Sweden", 
+                               country == "WA" ~ "Belgium")) %>%
+    dplyr::select(Country, year, disturbance.type, Prevalence)
+  
+  countryLevelInfo.in <- countryLevelInfo.in %>%
+    mutate(Country = case_when(country == "DE" ~ "Germany", 
+                               country == "ES" ~ "Spain", 
+                               country == "FI" ~ "Finland", 
+                               country == "FR" ~ "France", 
+                               country == "SW" ~ "Sweden", 
+                               country == "WA" ~ "Belgium")) %>%
+    gather(key = "type", value = "Year", "min.year", "max.year") %>%
+    dplyr::select(Country, Year)
+  
+  out.data %>%
+    ggplot(aes(x = year, y = Prevalence, color = disturbance.type, group = disturbance.type)) + 
+    geom_line(size = 1) + 
+    facet_wrap(~ Country, nrow = 2) + 
+    scale_colour_manual(values = c("#F4A259", "#8CB369", "#5B8E7D")) +
+    geom_vline(data = countryLevelInfo.in, 
+               aes(xintercept = Year), linetype = "dashed")+
+    xlab("Year") + ylab("Annual prevalence (%)") +
+    scale_x_continuous(breaks = c(199:202)*10) +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 13), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_blank(),
+          strip.background = element_blank(), 
+          strip.text = element_text(size = 12, hjust = 0))
 }
