@@ -567,14 +567,14 @@ library(sf)
 #' @param dir Directory where disturbance data are stored
 
 Get_disturbance_per_plot_per_country <- function(country, buffer, FUNDIV_tree, dir){
-  print(paste0("Getting disturbance value for ", country))
-  
   ## Step 1 - Get raster data
   print("-- Getting disturbance raster")
   disturbance_type_raster.in <- raster(paste0(dir, "/storm_fire_other_classification_", 
                                               country, ".tif"))
   disturbance_year_raster.in <- raster(paste0(dir, "/disturbance_year_1986-2020_", 
                                               country, ".tif"))
+  disturbance_severity_raster.in <- raster(paste0(dir, "/disturbance_severity_1986-2016_", 
+                                                  country, ".tif"))
   
   ## Step 2 - Create a SPDF with a buffer around each FUNDIV plots
   print("-- Creating SPDF for FUNDIV plots")
@@ -605,9 +605,13 @@ Get_disturbance_per_plot_per_country <- function(country, buffer, FUNDIV_tree, d
   print("----------Raster 2: disturbance year")
   disturbance_year_raster.in_extract <- exact_extract(
     disturbance_year_raster.in, FUNDIV_plots_polygon.in)
+  print("----------Raster 3: disturbance severity")
+  disturbance_severity_raster.in_extract <- exact_extract(
+    disturbance_severity_raster.in, FUNDIV_plots_polygon.in)
   
   ## Step 4 : Format the dataset
   print("-- Formating the data")
+  # Inclusion of type
   out <- data.frame(t(sapply(disturbance_type_raster.in_extract, c))) %>%
     mutate(V = substr(value, start = 3, stop = nchar(value) - 1), 
            A = substr(coverage_fraction, start = 3, 
@@ -617,12 +621,20 @@ Get_disturbance_per_plot_per_country <- function(country, buffer, FUNDIV_tree, d
     separate(A, into = paste0("area.", c(1:max(sapply(disturbance_type_raster.in_extract, nrow)))), 
              sep = ", ", fill = "right") %>%
     dplyr::select(-value, -coverage_fraction) %>%
+    # Inclusion of year
     cbind(data.frame(t(sapply(disturbance_year_raster.in_extract, c)))) %>%
     mutate(value = substr(value, start = 3, stop = nchar(value) - 1), 
            plotcode = FUNDIV_plots_polygon.in@data$plotcode) %>%
     separate(value, into = paste0("year.", c(1:max(sapply(disturbance_type_raster.in_extract, nrow)))),
              sep = ", ", fill = "right") %>%
     dplyr::select(-coverage_fraction) %>%
+    # Inclusion of severity
+    cbind(data.frame(t(sapply(disturbance_severity_raster.in_extract, c)))) %>%
+    mutate(value = substr(value, start = 3, stop = nchar(value) - 1)) %>%
+    separate(value, into = paste0("seve.", c(1:max(sapply(disturbance_severity_raster.in_extract, nrow)))),
+             sep = ", ", fill = "right") %>%
+    dplyr::select(-coverage_fraction) %>%
+    # Finalize formatting
     gather(key, value, -plotcode) %>%
     mutate(info = sub("\\..+", "", key), 
            cell = as.numeric(sub("....\\.", "", key))) %>%
@@ -630,11 +642,12 @@ Get_disturbance_per_plot_per_country <- function(country, buffer, FUNDIV_tree, d
     spread(info, value) %>%
     filter(type %in% as.character(c(1:3))) %>%
     mutate(type = as.numeric(type), 
-           year = as.numeric(year)) %>%
-    dplyr::select(-cell) %>%
+           year = as.numeric(year), 
+           severity = as.numeric(seve)/100) %>%
+    dplyr::select(-cell, -seve) %>%
     group_by(plotcode) %>%
     mutate(area.cell = sum(as.numeric(area))) %>%
-    group_by(plotcode, type, year) %>%
+    group_by(plotcode, type, year, severity) %>%
     summarize(coverage = sum(as.numeric(area, na.rm = T))/mean(area.cell, na.rm = T))
                  
   return(out)
@@ -684,9 +697,10 @@ add_disturbance_to_FUNDIV <- function(FUNDIV_tree, disturbance_per_plot){
     mutate(disturbance = case_when(type == 1 ~ "disturbance.other", 
                                    type == 2 ~ "disturbance.storm", 
                                    type == 3 ~ "disturbance.fire")) %>%
-    dplyr::select(plotcode, disturbance, coverage) %>%
+    dplyr::select(plotcode, disturbance, coverage, severity) %>%
+    mutate(coverage2 = coverage*severity) %>%
     group_by(plotcode, disturbance) %>%
-    summarize(Area = sum(coverage, na.rm = T)) %>%
+    summarize(Area = sum(coverage2, na.rm = T)) %>%
     spread(key = disturbance, value = Area, fill = NA) 
   
   # Add to the FUNDIV dataset and organize columns to ensure uniformity

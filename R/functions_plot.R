@@ -38,7 +38,7 @@ Map_FUNDIVplots_areaCoveredPerDisturbance <- function(FUNDIV_tree_with_disturban
   
   # Map the generated sf object
   ne_countries(scale = "medium", returnclass = "sf") %>%
-    ggplot() +
+    ggplot(aes(geometry = geometry)) +
     geom_sf(fill = "#E9ECEF", show.legend = F) +
     geom_sf(data = FUNDIV_tree_withdisturbance.in, 
             shape = 16, aes(color = coverage), 
@@ -126,13 +126,21 @@ Compare_NFI_Senf_disturbance_area <- function(FUNDIV_tree_with_disturbance,
 #'              of "Senf" disturbance.
 #' @param FUNDIV_tree_disturbance FUNDIV tree table with disturbance data
 #' @param title.in Character : title of the plot (useful to specify the buffer)
+#' @param death.in character vector, indicating which status is considered a dead tree 
+#'                 Possible choices: "natural mortality", "harvested", "unknown cause"
 
-plot_areaDisturbance_perMortalityRate <- function(FUNDIV_tree_disturbance, title.in){
+plot_areaDisturbance_perMortalityRate <- function(FUNDIV_tree_disturbance, title.in, death.in){
+  # Identify the status corresponding to death modes. 
+  death.status.in <- data.frame(tree.status = c(4, 3, 5), 
+                                death = c("natural mortality", "harvested", "unknown cause"))
+  this.status.in <- death.status.in$tree.status[which(death.status.in$death %in% death.in)]
+  
+  # Make the plot
   FUNDIV_tree_disturbance %>%
-    # Remove harvested trees, recruits, and unknown cause of death
-    filter(treestatus_th %in% c(2, 4)) %>%
+    # Remove death status not in death.in, and recruits (2)
+    filter(treestatus_th %in% c(2, this.status.in)) %>%
     # Compute mortality per plot
-    mutate(death.count = case_when(treestatus_th == 4 ~ 1, TRUE ~ 0)) %>%
+    mutate(death.count = case_when(treestatus_th %in% this.status.in ~ 1, TRUE ~ 0)) %>%
     dplyr::select(plotcode, death.count, disturbance.fire, disturbance.storm, disturbance.other) %>%
     replace_na(replace = list(disturbance.fire = 0, 
                               disturbance.storm = 0, 
@@ -166,7 +174,9 @@ plot_areaDisturbance_perMortalityRate <- function(FUNDIV_tree_disturbance, title
     geom_bar(stat = "identity") + 
     geom_text(aes(y = label.pos, label= label), vjust=-0.2, size=3.5, inherit.aes = T) + 
     scale_fill_manual(values = c("#F4A259", "#8CB369", "#5B8E7D", "#E0E1DD")) +
-    xlab("Mortality rate (plot level)") + ylab("% of the area affected") +
+    xlab(paste0("Mortality rate (%) based on ", 
+                paste(death.in, collapse = " + "))) + 
+    ylab("% of the area affected") +
     theme(panel.background = element_rect(color = 'black', fill = 'white'), 
           panel.grid = element_blank(),
           axis.text.y = element_text(size = 11), 

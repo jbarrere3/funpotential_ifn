@@ -319,13 +319,16 @@ To make the plots below, we computed the mortality rate of each plot (harvested 
 list(
   tar_target(plot_disturbedArea_perMortalityRate_15m, 
            plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance15m, 
-                                                 "Buffer = 15m radius")), 
+                                                 "Buffer = 15m radius", 
+                                                 death.in = "natural mortality")), 
   tar_target(plot_disturbedArea_perMortalityRate_100m, 
            plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance100m, 
-                                                 "Buffer = 100m radius")), 
+                                                 "Buffer = 100m radius", 
+                                                 death.in = "natural mortality")), 
   tar_target(plot_disturbedArea_perMortalityRate_200m, 
            plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
-                                                 "Buffer = 200m radius"))
+                                                 "Buffer = 200m radius", 
+                                                 death.in = "natural mortality"))
 )
 ```
 
@@ -352,7 +355,46 @@ ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_200m),
        height = 12, width = 20, unit = 'cm')  
 ```
 
+In the 3 plots above, we only considered natural mortality when calculating mortality rates (harvested trees, or trees that died of unknown causes were removed from the dataset). In the three plots below, we show the same figure than above (with 200m-radius buffer), but with different approaches to calculate the mortality rates (with harvest only, unknown cause only, or all cause of death confounded)
 
+
+```{targets plot-disturbedArea-perMortalityRate-different-death-cause}
+list(
+  tar_target(plot_disturbedArea_perMortalityRate_200m_harvest, 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
+                                                 "Buffer = 200m radius", 
+                                                 death.in = "harvested")), 
+  tar_target(plot_disturbedArea_perMortalityRate_200m_unknown, 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
+                                                 "Buffer = 200m radius", 
+                                                 death.in = "unknown cause")), 
+  tar_target(plot_disturbedArea_perMortalityRate_200m_alldeath, 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
+                                                 "Buffer = 200m radius", 
+                                                 death.in = c("natural mortality", "harvested", "unknown cause")))
+)
+```
+
+```{r save-plot-disturbedArea-perMortalityRate-200m-harvest, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_disturbedArea_perMortalityRate_200m_harvest)
+ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_200m_harvest), 
+       filename = "plots/plot_disturbedArea_perMortalityRate_200m_harvest.pdf", 
+       height = 12, width = 20, unit = 'cm')  
+```
+
+```{r save-plot-disturbedArea-perMortalityRate-200m-unknown, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_disturbedArea_perMortalityRate_200m_unknown)
+ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_200m_unknown), 
+       filename = "plots/plot_disturbedArea_perMortalityRate_200m_unknown.pdf", 
+       height = 12, width = 20, unit = 'cm')  
+```
+
+```{r save-plot-disturbedArea-perMortalityRate-200m-alldeath, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath)
+ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath), 
+       filename = "plots/plot_disturbedArea_perMortalityRate_200m_alldeath.pdf", 
+       height = 12, width = 20, unit = 'cm')  
+```
 
 # Pipeline
 
