@@ -189,70 +189,21 @@ plot_areaDisturbance_perMortalityRate <- function(FUNDIV_tree_disturbance, title
 
 
 
-#' Plot Annual prevalence of each disturbance per country
-#' @description Function that compute the percentage of all plot buffer area 
-#'              affected by each disturbance, and that plot this annual prevalence 
-#'              per country and per year
-#' @param disturbance_per_plot dataframe containging the type, area and year of each 
-#'                                       disturbance intercepting a FUNDIV plot buffer
-#' @param FUNDIV_tree Tree table of FUNDIV data
-
-plot_annualPrevalence <- function(disturbance_per_plot, FUNDIV_tree){
-  disturbance.in <- disturbance_per_plot %>%
-    merge((FUNDIV_tree %>% dplyr::select(plotcode, country) %>% distinct()), 
-          by = "plotcode", all.x = T, all.y = F) %>%
-    mutate(disturbance.type = case_when(type == 3 ~ "Fire", 
-                                        type == 2 ~ "Storm", 
-                                        type == 1 ~ "Other")) %>%
-    group_by(country, year, disturbance.type) %>%
-    summarise(Area = sum(coverage)) %>%
-    filter(year %in% c(1986:2020)) %>%
-    mutate(id = paste(country, year, disturbance.type, sep = "_")) %>%
-    ungroup() %>%
-    dplyr::select(id, Area)
+#' Plot Annual prevalence 
+#' @description Function that the annual prevalence (%) of Senf disturbance
+#'              per country and per year, along with the period covered by FUNDIV census
+#' @param data_annualPrevalence A list with two df: @data.plot contains the prevalence (in %) 
+#'                              per country, year and disturbance and @country.date contains 
+#'                              the year of the oldest 1st census, and most recent 2nd census 
+#'                              per country
+plot_annualPrevalence <- function(data_annualPrevalence){
   
-  countryLevelInfo.in <- FUNDIV_tree %>%
-    mutate(end_year = start_year + yearsbetweensurveys) %>%
-    dplyr::select(plotcode, country, start_year, end_year) %>%
-    distinct() %>%
-    group_by(country) %>%
-    summarise(n.plot = n(), 
-              min.year = min(start_year, na.rm = T), 
-              max.year = max(end_year, na.rm = T))
-  
-  out.data <- expand.grid(country = c("DE", "ES", "FI", "FR", "SW", "WA"), 
-                               year = c(1986:2020), 
-                               disturbance.type = c("Fire", "Other", "Storm")) %>%
-    mutate(id = paste(country, year, disturbance.type, sep = "_")) %>%
-    merge(disturbance.in, by = "id", all.x = T) %>%
-    replace_na(list(Area = 0)) %>%
-    merge((countryLevelInfo.in %>% dplyr::select(country, n.plot)), 
-          by = "country", all.x = T) %>%
-    mutate(Prevalence = round(Area/n.plot*100, digits = 4), 
-           Country = case_when(country == "DE" ~ "Germany", 
-                               country == "ES" ~ "Spain", 
-                               country == "FI" ~ "Finland", 
-                               country == "FR" ~ "France", 
-                               country == "SW" ~ "Sweden", 
-                               country == "WA" ~ "Belgium")) %>%
-    dplyr::select(Country, year, disturbance.type, Prevalence)
-  
-  countryLevelInfo.in <- countryLevelInfo.in %>%
-    mutate(Country = case_when(country == "DE" ~ "Germany", 
-                               country == "ES" ~ "Spain", 
-                               country == "FI" ~ "Finland", 
-                               country == "FR" ~ "France", 
-                               country == "SW" ~ "Sweden", 
-                               country == "WA" ~ "Belgium")) %>%
-    gather(key = "type", value = "Year", "min.year", "max.year") %>%
-    dplyr::select(Country, Year)
-  
-  out.data %>%
+  data_annualPrevalence$data.plot %>%
     ggplot(aes(x = year, y = Prevalence, color = disturbance.type, group = disturbance.type)) + 
     geom_line(size = 1) + 
     facet_wrap(~ Country, nrow = 2) + 
     scale_colour_manual(values = c("#F4A259", "#8CB369", "#5B8E7D")) +
-    geom_vline(data = countryLevelInfo.in, 
+    geom_vline(data = data_annualPrevalence$country.date, 
                aes(xintercept = Year), linetype = "dashed")+
     xlab("Year") + ylab("Annual prevalence (%)") +
     scale_x_continuous(breaks = c(199:202)*10) +
@@ -264,4 +215,49 @@ plot_annualPrevalence <- function(disturbance_per_plot, FUNDIV_tree){
           legend.title = element_blank(),
           strip.background = element_blank(), 
           strip.text = element_text(size = 12, hjust = 0))
+}
+
+#' plot agreste against disturbance
+#' @description Function to plot salvage logging in France against prevalence of storm and fire
+#' @param annual_prevalence list containing as first element a dataframe with prevalence per country and per year
+#' @param data_agreste Agreste data on salvage logging annual volumes in France
+#' @return a ggplot object
+plot_agreste_disturbance <- function(annual_prevalence.in, data_agreste.in){
+  # Plot salvage logging volumes
+  out.plot.a <- data_agreste.in %>%
+    ggplot(aes(x = year, y = Volume, group = Use, colour = Use)) + 
+    geom_line(size = 1) + 
+    xlab("") + ylab(expression(atop("Volume "("m"^3)))) + 
+    scale_x_continuous(breaks = c(2009, 2012, 2015, 2018)) + 
+    scale_color_manual(values = c("#6A994E", "#8D99AE", "#936639", "#D62828")) +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 13), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_blank(), 
+          legend.position = c(0.8, 0.7), 
+          legend.key = element_rect(fill = alpha("white", 0.0))) 
+  
+  # Plot prevalence of storm and fire in france from 2009 to 2019
+  out.plot.b <- annual_prevalence.in$data.plot %>%
+    filter(year %in% c(2009:2019), Country == "France", 
+           disturbance.type %in% c("Fire", "Storm")) %>%
+    ggplot(aes(x = year, y = Prevalence, color = disturbance.type, group = disturbance.type)) + 
+    geom_line(size = 1) + 
+    scale_colour_manual(values = c("#F4A259", "#5B8E7D")) +
+    ylab(expression(atop("Annual prevalence", "in France (%)"))) + xlab("") +
+    scale_x_continuous(breaks = c(2009, 2012, 2015, 2018)) +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 13), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_blank(), 
+          legend.position = c(0.8, 0.8), 
+          legend.key = element_rect(fill = alpha("white", 0.0))) 
+  
+  # Merge the two plots
+  plot_grid(out.plot.a, out.plot.b, nrow = 2, 
+            labels = c("(a)", "(b)"), align = "v")
 }

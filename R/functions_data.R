@@ -549,7 +549,7 @@ Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, TreeMort_plot, FUNDIV
 
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### Section 4 - R. Seidl & C. Senf disturbance data       ####
+#### Section 4 - Disturbance data                          ####
 #' @description Functions used to read disturbance spatial data
 #' @authors Julien BARRERE
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
@@ -715,6 +715,88 @@ add_disturbance_to_FUNDIV <- function(FUNDIV_tree, disturbance_per_plot){
 
 
 
+#' Get Annual prevalence of each disturbance per country
+#' @description Function that compute the percentage of all plot buffer area 
+#'              affected by each disturbance per country and per year
+#' @param disturbance_per_plot dataframe containging the type, area and year of each 
+#'                                       disturbance intercepting a FUNDIV plot buffer
+#' @param FUNDIV_tree Tree table of FUNDIV data
+#' @return A list with two df: @data.plot contains the prevalence (in %) per country, 
+#'                                        year and disturbance
+#'                             @country.date contains the year of the oldest 1st census, 
+#'                                           and most recent 2nd census per country
+get_annualPrevalence <- function(disturbance_per_plot, FUNDIV_tree){
+  disturbance.in <- disturbance_per_plot %>%
+    merge((FUNDIV_tree %>% dplyr::select(plotcode, country) %>% distinct()), 
+          by = "plotcode", all.x = T, all.y = F) %>%
+    mutate(disturbance.type = case_when(type == 3 ~ "Fire", 
+                                        type == 2 ~ "Storm", 
+                                        type == 1 ~ "Other")) %>%
+    group_by(country, year, disturbance.type) %>%
+    summarise(Area = sum(coverage)) %>%
+    filter(year %in% c(1986:2020)) %>%
+    mutate(id = paste(country, year, disturbance.type, sep = "_")) %>%
+    ungroup() %>%
+    dplyr::select(id, Area)
+  
+  countryLevelInfo.in <- FUNDIV_tree %>%
+    mutate(end_year = start_year + yearsbetweensurveys) %>%
+    dplyr::select(plotcode, country, start_year, end_year) %>%
+    distinct() %>%
+    group_by(country) %>%
+    summarise(n.plot = n(), 
+              min.year = min(start_year, na.rm = T), 
+              max.year = max(end_year, na.rm = T))
+  
+  out.data <- expand.grid(country = c("DE", "ES", "FI", "FR", "SW", "WA"), 
+                          year = c(1986:2020), 
+                          disturbance.type = c("Fire", "Other", "Storm")) %>%
+    mutate(id = paste(country, year, disturbance.type, sep = "_")) %>%
+    merge(disturbance.in, by = "id", all.x = T) %>%
+    replace_na(list(Area = 0)) %>%
+    merge((countryLevelInfo.in %>% dplyr::select(country, n.plot)), 
+          by = "country", all.x = T) %>%
+    mutate(Prevalence = round(Area/n.plot*100, digits = 4), 
+           Country = case_when(country == "DE" ~ "Germany", 
+                               country == "ES" ~ "Spain", 
+                               country == "FI" ~ "Finland", 
+                               country == "FR" ~ "France", 
+                               country == "SW" ~ "Sweden", 
+                               country == "WA" ~ "Belgium")) %>%
+    dplyr::select(Country, year, disturbance.type, Prevalence)
+  
+  countryLevelInfo.in <- countryLevelInfo.in %>%
+    mutate(Country = case_when(country == "DE" ~ "Germany", 
+                               country == "ES" ~ "Spain", 
+                               country == "FI" ~ "Finland", 
+                               country == "FR" ~ "France", 
+                               country == "SW" ~ "Sweden", 
+                               country == "WA" ~ "Belgium")) %>%
+    gather(key = "type", value = "Year", "min.year", "max.year") %>%
+    dplyr::select(Country, Year)
+  
+  out <- list()
+  out$data.plot <- out.data
+  out$country.date <- countryLevelInfo.in
+  return(out)
+}
+
+
+# Import and format AGRESTE salvage logging data
+#' @description Import and format AGRESTE data on salvage logging at national level
+#' @param path.in path to the csv file containing agreste data
+#' @return A dataframe formated in english
+
+import_agreste <- function(path.in){
+  as.data.frame(t(read.csv(path.in, header = F, sep = ";"))) %>%
+    `colnames<-`(.[1, ]) %>%
+    .[-1, ] %>%
+    mutate_if(is.character, as.numeric) %>%
+    rename('year' = 'Recolte', 'Log' = 'grumes', 'Total' = 'total', 
+           'Industry' = 'industrie', 'Energy' = 'energie') %>%
+    gather('Total', 'Industry', 'Log', 'Energy', 
+           key = 'Use', value = 'Volume')
+}
 
 
 
