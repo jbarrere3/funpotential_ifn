@@ -30,6 +30,10 @@ list(
                                                  "Buffer = 200m radius", 
                                                  death.in = c("natural mortality", "harvested", "unknown cause"))), 
   tar_target(plot_agreste_against_disturbance, 
-             plot_agreste_disturbance(prevalence_per_country_per_year, data_agreste))
+             plot_agreste_disturbance(prevalence_per_country_per_year, data_agreste)), 
+  tar_target(plot_compare_mortality_tree_plot_level, 
+             plot_mortality_tree_plot(NFI_tree_alive_remeasure, NFI_plot_remeasure)),
+  tar_target(plot_probability_to_be_harvested, 
+             plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive))
   
 )

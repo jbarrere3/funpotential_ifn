@@ -261,3 +261,134 @@ plot_agreste_disturbance <- function(annual_prevalence.in, data_agreste.in){
   plot_grid(out.plot.a, out.plot.b, nrow = 2, 
             labels = c("(a)", "(b)"), align = "v")
 }
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 2 - Data Analysis - FUNDIV / Disturbances ####
+#' @description Functions to analyse the relation between tree
+#'              mortality (FUNDIV) and disturbances (Senf 2021)
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+
+#' Plot mortality tree and plot level - French NFI
+#' @description Function to compare disturbance-related mortality estimated by NFI agents in France at the plot level
+#'              with tree level mortality, computed with and without the harvest rate. 
+#' @param NFI_tree_alive_remeasure Table of census 2 data at tree level, for trees that were alive at census 1
+#' @param NFI_plot_remeasure Table of census 2 data at plot level
+plot_mortality_tree_plot <- function(NFI_tree_alive_remeasure, NFI_plot_remeasure){
+  data.plot.in <- NFI_tree_alive_remeasure %>%
+    filter(!(veget5 %in% c("N", "T"))) %>%
+    mutate(alive = case_when(veget5 %in% c("0") ~ 1, TRUE ~ 0), 
+           dead = case_when(veget5 %in% c("M", "A", "1", "2") ~ 1, TRUE ~ 0),
+           harvested = case_when(veget5 %in% c("6", "7") ~ 1, TRUE ~ 0)) %>%
+    group_by(idp) %>%
+    summarise(death.rate = sum(dead, na.rm = T)/n()*100,
+              alive.rate = sum(alive, na.rm = T)/n()*100,
+              harvest.rate = sum(harvested, na.rm = T)/n()*100) %>%
+    merge(NFI_plot_remeasure, by = "idp", all.x = T, all.y = F) %>%
+    filter(!is.na(year))
+  
+  data.plot.in %>% 
+    mutate(disturbance_intensity = case_when(incid5 == 0 ~ "0%", 
+                                             incid5 == 1 ~ "1% - 25%", 
+                                             incid5 == 2 ~ "25% - 50%", 
+                                             incid5 == 3 ~ "50% - 75%", 
+                                             incid5 == 4 ~ "75% - 100%"), 
+           deathAndHarvest.rate = harvest.rate + death.rate) %>%
+    filter(!(is.na(disturbance_intensity))) %>%
+    gather(key = "rate.method", value = "rate", "deathAndHarvest.rate", "death.rate") %>%
+    mutate(rate.method = case_when(rate.method == "death.rate" ~ "Mortality only", 
+                                   rate.method == "deathAndHarvest.rate" ~ "Mortality and harvest")) %>%
+    ggplot(aes(x = disturbance_intensity, y = rate)) + 
+    geom_boxplot(fill = "lightgray") + 
+    facet_wrap(~ rate.method) + 
+    xlab("Disturbance intensity (NFI estimation)") + 
+    ylab("Mortality rate from tree data") +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 13),
+          strip.background = element_blank(), 
+          strip.text = element_text(size = 12, face = "bold")) + 
+    geom_hline(yintercept = c(25, 50, 75), linetype = "dashed", colour = "red")
+}
+
+
+
+#' Plot harvest probability
+#' @description Function to plot a modeled probability to be harvested as a function
+#'              of dbh, and of whether the tree was alive, or dead (due to different causes)
+#' @param NFI_tree_alive_remeasure Table of census 2 data at tree level, for trees that were alive at census 1
+#' @param NFI_plot_remeasure Table of census 2 data at plot level
+#' @param NFI_tree_alive Table containing data of census 1 and 2 for trees that were alive at census 1
+plot_harvest_probability <- function(NFI_tree_alive_remeasure, NFI_plot_remeasure, 
+                                     NFI_tree_alive){
+  # Format data at plot level
+  data.plot.in <- NFI_tree_alive_remeasure %>%
+    # Remove lost trees
+    filter(!(veget5 %in% c("N", "T"))) %>%
+    mutate(alive = case_when(veget5 %in% c("0") ~ 1, TRUE ~ 0), 
+           dead = case_when(veget5 %in% c("M", "A", "1", "2") ~ 1, TRUE ~ 0),
+           harvested = case_when(veget5 %in% c("6", "7") ~ 1, TRUE ~ 0)) %>%
+    group_by(idp) %>%
+    # Compute alive / death / harvest rate
+    summarise(death.rate = sum(dead, na.rm = T)/n()*100,
+              alive.rate = sum(alive, na.rm = T)/n()*100,
+              harvest.rate = sum(harvested, na.rm = T)/n()*100) %>%
+    merge(NFI_plot_remeasure, by = "idp", all.x = T, all.y = F) %>%
+    filter(!is.na(year))  # Remove unknown years
+    #filter(!(nincid5 == 0 & death.rate > 0)) # Remove undisturbed plots without death
+  
+  # Format data at tree level
+  data.tree.in <- NFI_tree_alive_remeasure %>%
+    merge(NFI_plot_remeasure, by = "idp", all.x = T, all.y = F) %>%
+    # Remove lost trees
+    filter(!(veget5 %in% c("N", "T"))) %>%
+    # Remove trees in undisturbed plots with mortality
+    filter(idp %in% data.plot.in$idp) %>%
+    # Remove alive trees in disturbed plots
+    filter(!(nincid5 > 0 & veget5 == "0")) %>%
+    # Remove dead trees in undisturbed plots
+    #filter(!(nincid5 == 0 & veget5 %in% c("M", "A", "1", "2"))) %>%
+    # Remove unknown incident 
+    filter(!(is.na(nincid5))) %>%
+    # create status and harvest column
+    mutate(status = case_when(nincid5 == 0 ~ "alive or BM", 
+                              nincid5 == 1 ~ "dead fire", 
+                              nincid5 == 4 ~ "dead storm", 
+                              nincid5 %in% c(2, 3, 5) ~ "dead other disturbance"), 
+           harvest = case_when(veget5 %in% c("6", "7") ~ 1, 
+                               veget5 %in% c("0", "M", "A", "1", "2") ~ 0), 
+           idt = paste0(idp, "_", a)) %>%
+    # add dbh at census1
+    merge((NFI_tree_alive %>% mutate(idt = paste0(idp, "_", a)) %>% dplyr::select(idt, c13)), 
+          by = "idt", all.x = T, all.y = F) %>%
+    mutate(dbh = round(c13*10/pi, digits = 0)) %>%
+    dplyr::select(idp, idt, dbh, year, status, harvest)
+  
+  # harvest model
+  model.in = glm(harvest ~ dbh*status, 
+                 data = data.tree.in, 
+                 family = binomial(link = "logit"))
+  newdata.in <- expand.grid(dbh = c(100:1500), 
+                               status = unique(data.tree.in$status))
+  newdata.in$fit <- predict(model.in, newdata = newdata.in, 
+                               type = "response")# plot data
+  
+  # plot data
+  newdata.in %>%
+    ggplot(aes(x = dbh, y = fit, colour = status, group = status)) + 
+    geom_line(size = 1) + 
+    ylim(0, 1) + 
+    xlab("DBH (mm)") + ylab("Harvest probability") + 
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 13), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_blank(), 
+          legend.key = element_rect(fill = alpha("white", 0.0)))
+}
+

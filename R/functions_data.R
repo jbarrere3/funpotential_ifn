@@ -904,6 +904,10 @@ Format_trees_FUNDIV_to_FinnishNFI <- function(FUNDIV_FrenchNFI_tree, NFI_tree,
            status = NA_integer_) %>%
     dplyr::select(colnames(out.census1)) %>%
     rbind.data.frame(out.census1) %>%
+    mutate(occurence_of_disturbance = case_when(NFI_identifier == "census1" ~ NA_real_, 
+                                                NFI_identifier == "census2" ~ occurence_of_disturbance), 
+           severity_of_disturbance = case_when(NFI_identifier == "census1" ~ NA_integer_, 
+                                               NFI_identifier == "census2" ~ severity_of_disturbance)) %>%
     arrange(area_identifier1, tree_id, NFI_identifier)
   
 }

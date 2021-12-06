@@ -315,7 +315,11 @@ list(
                                                  "Buffer = 200m radius", 
                                                  death.in = c("natural mortality", "harvested", "unknown cause"))), 
   tar_target(plot_agreste_against_disturbance, 
-             plot_agreste_disturbance(prevalence_per_country_per_year, data_agreste))
+             plot_agreste_disturbance(prevalence_per_country_per_year, data_agreste)), 
+  tar_target(plot_compare_mortality_tree_plot_level, 
+             plot_mortality_tree_plot(NFI_tree_alive_remeasure, NFI_plot_remeasure)),
+  tar_target(plot_probability_to_be_harvested, 
+             plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive))
   
 )
 ```
@@ -412,4 +416,26 @@ ggplot2::ggsave(tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath),
 
 
 
+# Data analysis - Disturbance data and FUNDIV
 
+To take into account salvage logging in the survival model, we need to compute a probability to be harvested knowing that the tree is alive, or dead. To that end, we can use the estimation by NFI agents in France of the disturbance that occurred in the plot. First, we need to compare the mortality at plot level with real mortality at tree level, computed with two different approaches (with or without mortality rate).  
+
+
+```{r save-plot-compare-mortality-tree-plot-level, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_compare_mortality_tree_plot_level)
+ggplot2::ggsave(tar_read(plot_compare_mortality_tree_plot_level), 
+       filename = "plots/plot_compare_mortality_tree_plot_level.pdf", 
+       height = 12, width = 20, unit = 'cm')  
+```
+
+Mortality rate at the tree level matches mortality at the plot level when it is computed with the harvest rate. From this result, we can assume that in a plot affected by a disturbance, all trees that were harvested were dead before to be harvested. In the case of undisturbed, it is not possible to know whether harvested trees experienced background mortality before, or were alive. Therefore, we need to make the assumption that trees that died from background mortality have the same probability to be harvested than alive trees. 
+
+Based on these assumptions, we modeled the harvest probability with a simple binomial glm with a logit link function as a function of the status (alive or dead due to disturbance or background mortality) and of the dbh at census 1. 
+
+
+```{r save-plot-harvest-probability, fig.height=6, fig.width=10, fig.align='center'}
+tar_read(plot_probability_to_be_harvested)
+ggplot2::ggsave(tar_read(plot_probability_to_be_harvested), 
+       filename = "plots/plot_probability_to_be_harvested.pdf", 
+       height = 15, width = 25, unit = 'cm')  
+```
