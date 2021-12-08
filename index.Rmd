@@ -374,7 +374,7 @@ cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_15m) +
 
 In the 3 plots above, we only considered natural mortality when calculating mortality rates (harvested trees, or trees that died of unknown causes were removed from the dataset). In the three plots below, we show the same figure than above (with 200m-radius buffer), but with different approaches to calculate the mortality rates (with harvest only, unknown cause only, or all cause of death confounded)
 
-```{r plot-disturbedArea-perMortalityRate-200m-harvest, fig.height=8, fig.width=10, fig.align='center', dpi=600}
+```{r plot-disturbedArea-perMortalityRate-200m-harvest, fig.height=5.6, fig.width=8, fig.align='center', dpi=600}
 cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_200m_harvest) + 
                      ggplot2::theme(legend.position = "none"), 
           tar_read(plot_disturbedArea_perMortalityRate_200m_unknown) + 
