@@ -366,29 +366,53 @@ plot_harvest_probability <- function(NFI_tree_alive_remeasure, NFI_plot_remeasur
     merge((NFI_tree_alive %>% mutate(idt = paste0(idp, "_", a)) %>% dplyr::select(idt, c13)), 
           by = "idt", all.x = T, all.y = F) %>%
     mutate(dbh = round(c13*10/pi, digits = 0)) %>%
-    dplyr::select(idp, idt, dbh, year, status, harvest)
+    dplyr::select(idp, idt, dbh, year, status, harvest, incid5)
   
   # harvest model
-  model.in = glm(harvest ~ dbh*status, 
+  model.in = glm(harvest ~ dbh*status + status*incid5, 
                  data = data.tree.in, 
                  family = binomial(link = "logit"))
   newdata.in <- expand.grid(dbh = c(100:1500), 
-                               status = unique(data.tree.in$status))
-  newdata.in$fit <- predict(model.in, newdata = newdata.in, 
-                               type = "response")# plot data
+                            status = unique(data.tree.in$status), 
+                            incid5 = unique(data.tree.in$incid5)) %>%
+    filter(!(is.na(incid5))) %>%
+    filter(!(incid5 == 0 & status != "alive or BM")) %>%
+    filter(!(incid5 > 0 & status == "alive or BM"))
+   
+  # Add prediction and confidence interval
+  model.in.linkFunction <- family(model.in)$linkinv
+  
+  newdata.in <- bind_cols(newdata.in, setNames(as_tibble(predict(model.in, newdata.in, se.fit = TRUE)[1:2]),
+                            c('fit_link','se_link')))
+  newdata.in <- mutate(newdata.in,
+                  fit_resp  = model.in.linkFunction(fit_link),
+                  right_upr = model.in.linkFunction(fit_link + (se_link)),
+                  right_lwr = model.in.linkFunction(fit_link - (se_link)))
   
   # plot data
   newdata.in %>%
-    ggplot(aes(x = dbh, y = fit, colour = status, group = status)) + 
-    geom_line(size = 1) + 
+    mutate(disturbance_intensity = case_when(incid5 == 0 ~ "0%", 
+                                             incid5 == 1 ~ "1% - 25%", 
+                                             incid5 == 2 ~ "25% - 50%", 
+                                             incid5 == 3 ~ "50% - 75%", 
+                                             incid5 == 4 ~ "75% - 100%"))  %>%
+    ggplot(aes(x = dbh, y = fit_resp, group = disturbance_intensity)) + 
+    geom_line(size = 1, aes(colour = disturbance_intensity)) + 
+    geom_ribbon(aes(ymin = right_lwr, ymax = right_upr, fill = disturbance_intensity), 
+                alpha = 0.2) +
+    facet_wrap(~ status) +
     ylim(0, 1) + 
     xlab("DBH (mm)") + ylab("Harvest probability") + 
+    scale_color_manual(values = c("#F8BB49", "#F6AA1C", "#D97212", "#BC3908", "#A82A0A")) +
+    scale_fill_manual(values = c("#F8BB49", "#F6AA1C", "#D97212", "#BC3908", "#A82A0A")) +
     theme(panel.background = element_rect(color = 'black', fill = 'white'), 
           panel.grid = element_blank(),
           axis.text = element_text(size = 11), 
           axis.title = element_text(size = 13), 
           legend.text = element_text(size = 12), 
-          legend.title = element_blank(), 
-          legend.key = element_rect(fill = alpha("white", 0.0)))
+          legend.title = element_text(size = 12), 
+          legend.key = element_rect(fill = alpha("white", 0.0)),
+          strip.background = element_blank(), 
+          strip.text = element_text(size = 12, face = "bold"))
 }
 

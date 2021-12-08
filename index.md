@@ -7,15 +7,14 @@ output:
     keep_md: true
 ---
 
-```{r setup, include = FALSE}
-knitr::opts_chunk$set(collapse = TRUE, comment = "#>", fig.path = "plots/fig_")
-```
+
 
 # Packages and set up
 
 We start by loading the required packages. `targets` must be version 0.5.0.9000 or above. 
 
-```{r, eval = FALSE}
+
+```r
 require(c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
           "data.table", "knitr", "stringr", "measurements", "sf", "raster",
           "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
@@ -24,7 +23,8 @@ require(c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
 
-```{r}
+
+```r
 library(targets)
 tar_unscript()
 ```
@@ -33,7 +33,8 @@ tar_unscript()
 
 We define some global options/functions common to all targets, and load the functions located in the R directory of the repository. 
 
-```{targets example-globals, tar_globals = TRUE}
+
+```r
 options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
 source("R/functions_plot.R")
@@ -43,6 +44,7 @@ tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
                             "stringr", "measurements", "sf", "raster",
                             "rgdal", "exactextractr", "rgeos", "rnaturalearth",
                             "rnaturalearthdata", "ggspatial", "cowplot"))
+#> Establish _targets.R and _targets_r/globals/example-globals.R.
 ```
 
 
@@ -55,7 +57,8 @@ We start by importing the following data on:
 - NFI plots remeasured (`NFI_plot_remeasure`) 
 - Individual trees remeasured that were either alive  (`NFI_tree_alive_remeasure`) or dead (`NFI_tree_dead_remeasure`) at first measurement. 
 
-```{targets import-NFI-data}
+
+```r
 list(
   tar_target(NFI_plot, read_plot(path = "data/FrenchNFI")), 
   tar_target(NFI_plot_elevation, read.csv("data/elevation_NFIplots.csv", sep = ";")),
@@ -67,6 +70,7 @@ list(
   tar_target(NFI_tree_dead_remeasure, read.csv("data/donnees_arbres_retour/foret_morts.csv", sep = ";"))
 )
 
+#> Establish _targets.R and _targets_r/targets/import-NFI-data.R.
 ```
 
 Second, we merge : 
@@ -74,12 +78,14 @@ Second, we merge :
 * the data on alive and dead trees to obtain `NFI_tree`
 * the remeasures of previously alive and dead trees to obtain `NFI_tree_remeasured`.
 
-```{targets NFI_tree_join}
+
+```r
 list(
   tar_target(NFI_tree, merge_dead_alive(NFI_tree_alive, NFI_tree_dead)),
   tar_target(NFI_tree_remeasured, 
              merge_NFI_remeasured(NFI_tree_alive_remeasure, NFI_tree_dead_remeasure))
 )
+#> Establish _targets.R and _targets_r/targets/NFI_tree_join.R.
 ```
 
 
@@ -92,20 +98,25 @@ We start by importing :
 * The existing species table in the NFI directory (`NFI_species`).
 * A correspondence table linking genus and families. This table was built from the NCBI Taxonomy database ([Federhen 2012](https://doi.org/10.1093/nar/gkr1178)).
 
-```{targets import-species-NFI}
+
+```r
 list(
   tar_target(NFI_species, read.csv("data/FrenchNFI/species.csv", sep = ",")), 
   tar_target(NFI_genus_species_correspondence, read.csv("data/TreeMort/correspondanceGenusFamilyNFI.csv", sep = ";"))
 )
+#> Establish _targets.R and _targets_r/targets/import-species-NFI.R.
 ```
 
 Using these two tables, we create a species table that matches TreeMort template (`TreeMort_species`), and write this table in the TreeMort directory. 
 
-```{targets format-species-NFI-to-TreeMort}
+
+```r
 tar_target(TreeMort_species, Format_species_TreeMort(NFI_species, NFI_genus_species_correspondence))
+#> Establish _targets.R and _targets_r/targets/format-species-NFI-to-TreeMort.R.
 ```
 
-```{r}
+
+```r
 write.table(tar_read(TreeMort_species), 
           file = "data/TreeMort/spp_data.csv", row.names = F)
 ```
@@ -116,23 +127,28 @@ write.table(tar_read(TreeMort_species),
 
 We start by formatting the table of the first (census 1) and second (census 2) measurements (both dead and alive trees).
 
-```{targets format-trees-NFI-to-TreeMort-by-census}
+
+```r
 list(
   tar_target(TreeMort_tree_census1, Format_trees_census1_TreeMort(NFI_tree, TreeMort_species)),
   tar_target(TreeMort_tree_census2, Format_trees_census2_TreeMort(NFI_tree_remeasured, TreeMort_tree_census1))
 )
+#> Establish _targets.R and _targets_r/targets/format-trees-NFI-to-TreeMort-by-census.R.
 ```
 
 We merge these two dataframes to obtain the complete tree NFI dataset formatted for TreeMort (`TreeMort_tree`), that we write in the TreeMort directory. 
 
-```{targets format-trees-NFI-to-TreeMort}
+
+```r
 tar_target(TreeMort_tree, 
            rbind(subset(TreeMort_tree_census1, 
                         tree.id %in% TreeMort_tree_census2$tree.id),
                  TreeMort_tree_census2))
+#> Establish _targets.R and _targets_r/targets/format-trees-NFI-to-TreeMort.R.
 ```
 
-```{r}
+
+```r
 write.table(tar_read(TreeMort_tree), 
           file = "data/TreeMort/tree_data.csv", row.names = F)
 ```
@@ -141,14 +157,17 @@ write.table(tar_read(TreeMort_tree),
 
 We format the `NFI_plot` table to fit into TreeMort template, and we write the formated table (`TreeMort_plot`) in the TreeMort directory.
 
-```{targets format-plots-NFI-to-TreeMort}
+
+```r
 list(
   tar_target(NFI_stand_age, Compute_NFI_stand_age(NFI_tree)), 
   tar_target(TreeMort_plot, Format_plots_TreeMort(NFI_plot, NFI_ecological_data, NFI_plot_elevation, NFI_stand_age))
 )
+#> Establish _targets.R and _targets_r/targets/format-plots-NFI-to-TreeMort.R.
 ```
 
-```{r}
+
+```r
 write.table(tar_read(TreeMort_plot), 
           file = "data/TreeMort/plot_data.csv", row.names = F)
 ```
@@ -157,17 +176,22 @@ write.table(tar_read(TreeMort_plot),
 
 First, we need to create a management variable describing the occurence of a cut in the last 5 years for each census. 
 
-```{targets create-management-census}
+
+```r
 tar_target(NFI_census_management, compute_management_census(NFI_plot, NFI_plot_remeasure))
+#> Establish _targets.R and _targets_r/targets/create-management-census.R.
 ```
 
 We format the `TreeMort_tree` table to create a census table fitting TreeMort template, and we write the formated table (`TreeMort_census`) in the TreeMort directory.
 
-```{targets format-census-TreeMort}
+
+```r
 tar_target(TreeMort_census, Format_census_TreeMort(TreeMort_tree, NFI_census_management))
+#> Establish _targets.R and _targets_r/targets/format-census-TreeMort.R.
 ```
 
-```{r}
+
+```r
 write.table(tar_read(TreeMort_census), 
           file = "data/TreeMort/census_data.csv", row.names = F)
 ```
@@ -176,11 +200,14 @@ write.table(tar_read(TreeMort_census),
 
 We write a metadata table in the TreeMort directory to specify important information on some columns. 
 
-```{targets metadata-TreeMort}
+
+```r
 tar_target(TreeMort_metadata, Meta_data_TreeMort())
+#> Establish _targets.R and _targets_r/targets/metadata-TreeMort.R.
 ```
 
-```{r}
+
+```r
 write.table(tar_read(TreeMort_metadata), 
           file = "data/TreeMort/meta_data.csv", row.names = F)
 ```
@@ -190,28 +217,34 @@ write.table(tar_read(TreeMort_metadata),
 ## Importation
 
 We start by importing the tree (`FUNDIV_tree_original`) and plot (`FUNDIV_plot`) datatables of FUNDIV. 
-```{targets import-FUNDIV}
+
+```r
 list(
   tar_target(FUNDIV_tree_original, read_FUNDIV_tree_data(data_path = "data/FUNDIV", remove_harv = TRUE)), 
   tar_target(FUNDIV_plot, read_FUNDIV_plot_data(data_path = "data/FUNDIV"))
 )
+#> Establish _targets.R and _targets_r/targets/import-FUNDIV.R.
 ```
 
 ## Inclusion of French NFI remeasured data
 
 Using `FUNDIV_plot` dataset, we can format the NFI trees that were measured twice to FUNDIV template. 
-```{targets format-trees-TreeMort-to-FUNDIV}
+
+```r
 tar_target(FUNDIV_FrenchNFI_tree, 
            Format_trees_TreeMort_to_FUNDIV(TreeMort_tree, TreeMort_plot, FUNDIV_plot))
+#> Establish _targets.R and _targets_r/targets/format-trees-TreeMort-to-FUNDIV.R.
 ```
 
 Lastly, we can replace the French data in the original FUNDIV tree dataset by the newly formatted `FUNDIV_FrenchNFI_tree`. 
 
-```{targets replace-FrenchNFI-FUNDIV}
+
+```r
 tar_target(FUNDIV_tree, 
            (FUNDIV_tree_original %>% 
              filter(country != "FR") %>% 
              rbind(FUNDIV_FrenchNFI_tree)))
+#> Establish _targets.R and _targets_r/targets/replace-FrenchNFI-FUNDIV.R.
 ```
 
 
@@ -219,25 +252,31 @@ tar_target(FUNDIV_tree,
 
 The Finnish NFI template is slightly different from the French NFI template or FUNDIV template. Therefore, we need to format them. 
 
-```{targets format-FUNDIV-to-FinnishNFI}
+
+```r
 tar_target(FinnishNFI_French_tree, 
            Format_trees_FUNDIV_to_FinnishNFI(FUNDIV_FrenchNFI_tree, NFI_tree, 
                                               NFI_plot_elevation, NFI_plot_remeasure, 
                                               NFI_ecological_data))
+#> Establish _targets.R and _targets_r/targets/format-FUNDIV-to-FinnishNFI.R.
 ```
 
-```{r}
+
+```r
 write.table(tar_read(FinnishNFI_French_tree), 
           file = "data/FinnishNFI/FinnishNFI_French_tree.csv", row.names = F)
 ```
 
 We write a metadata table in the FinnishNFI directory to specify important information on some columns. 
 
-```{targets metadata-FinnishNFI}
+
+```r
 tar_target(FinnishNFI_metadata, Meta_data_FinnishNFI())
+#> Establish _targets.R and _targets_r/targets/metadata-FinnishNFI.R.
 ```
 
-```{r}
+
+```r
 write.table(tar_read(TreeMort_metadata), 
           file = "data/FinnishNFI/FinnishNFI_meta_data.csv", row.names = F)
 ```
@@ -247,44 +286,53 @@ write.table(tar_read(TreeMort_metadata),
 
 We create a circular buffer around each FUNDIV plot center, and we associate each plot to the percentage of the buffer area covered by each type of disturbance ([Senf & Seidl, 2021a](https://doi.org/10.1111/gcb.15679)) that occured between 1986 and 2020. We use three size of circular buffer: 15m, 100m and 200m: 
 
-```{targets import-disturbance-Senf-areaPercentage}
+
+```r
 list(tar_target(disturbance_per_plot_15m, 
            Get_disturbance_per_plot(15, FUNDIV_tree, "data/Disturbance")), 
      tar_target(disturbance_per_plot_100m, 
            Get_disturbance_per_plot(100, FUNDIV_tree, "data/Disturbance")), 
      tar_target(disturbance_per_plot_200m, 
            Get_disturbance_per_plot(200, FUNDIV_tree, "data/Disturbance")))
+#> Establish _targets.R and _targets_r/targets/import-disturbance-Senf-areaPercentage.R.
 ```
 
 Secondly, we add this information in the FUNDIV database.
 
-```{targets add-Senf-areaPercentage-to-FUNDIV}
+
+```r
 list(tar_target(FUNDIV_tree_disturbance15m, 
            add_disturbance_to_FUNDIV(FUNDIV_tree, disturbance_per_plot_15m)), 
      tar_target(FUNDIV_tree_disturbance100m, 
            add_disturbance_to_FUNDIV(FUNDIV_tree, disturbance_per_plot_100m)), 
      tar_target(FUNDIV_tree_disturbance200m, 
            add_disturbance_to_FUNDIV(FUNDIV_tree, disturbance_per_plot_200m)))
+#> Establish _targets.R and _targets_r/targets/add-Senf-areaPercentage-to-FUNDIV.R.
 ```
 
 The code below extracts the prevalence (% of buffer area of all plots covered) of each disturbance type per country and per year, in order to monitor temporal variations in disturbance regimes. 
 
-```{targets get-disturbance-prevalence-per-country-and-year}
+
+```r
 tar_target(prevalence_per_country_per_year, 
            get_annualPrevalence(disturbance_per_plot_200m, FUNDIV_tree))
+#> Establish _targets.R and _targets_r/targets/get-disturbance-prevalence-per-country-and-year.R.
 ```
 
 
 Extraction of Agreste data on annual salvage logging volume in France (national level) from 2009 to 2019. 
 
-```{targets get-agreste-data}
+
+```r
 tar_target(data_agreste, import_agreste("data/Agreste/agreste_total.csv"))
+#> Establish _targets.R and _targets_r/targets/get-agreste-data.R.
 ```
 
 
 # Make all plots and run pipeline
 
-```{targets make-all-plots}
+
+```r
 list(
   tar_target(Map_areaCoveredPerDisturbance_FUNDIVplots, 
            Map_FUNDIVplots_areaCoveredPerDisturbance(FUNDIV_tree_disturbance100m)), 
@@ -324,9 +372,11 @@ list(
              plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive))
   
 )
+#> Establish _targets.R and _targets_r/targets/make-all-plots.R.
 ```
 
-```{r, message=FALSE, results='hide'}
+
+```r
 tar_make()
 ```
 
@@ -334,33 +384,49 @@ tar_make()
 # Data exploration - Disturbance data and FUNDIV
 
 We plot the percentage of the buffer around each plot covered by the three types of disturbance. 
-```{r AreaCoveredPerDisturbance, fig.height=3, fig.width=10, fig.align='center', dpi=600}
+
+```r
 tar_read(Map_areaCoveredPerDisturbance_FUNDIVplots)
+#> Scale on map varies by more than 10%, scale bar may be inaccurate
+#> Scale on map varies by more than 10%, scale bar may be inaccurate
+#> Scale on map varies by more than 10%, scale bar may be inaccurate
 ```
+
+<img src="plots/fig_AreaCoveredPerDisturbance-1.png" style="display: block; margin: auto;" />
 
 
 When focusing on france, we can compare the area covered by each disturance to the estimations of disturbance nature and intensity made by NFI agents. 
 
-```{r Compare_NFI_Senf_disturbance_area, fig.height=3, fig.width=10, fig.align='center', dpi=600}
+
+```r
 tar_read(plot_Compare_NFI_Senf_disturbance_area)
 ```
 
+<img src="plots/fig_Compare_NFI_Senf_disturbance_area-1.png" style="display: block; margin: auto;" />
+
 In the plot below, we compute from the dataset `disturbance_per_plot_200m` the percentage of the buffer area affected by each disturbance for each year and each country, and show this temporal and spatial variability. We also added the year of first and last measurement for each country (vertical dotted black lines). 
 
-```{r plot-prevalence-per-country-per-year, fig.height=5, fig.width=10, fig.align='center', dpi=600}
+
+```r
 tar_read(plot_prevalence_per_country_per_year)
 ```
 
+<img src="plots/fig_plot-prevalence-per-country-per-year-1.png" style="display: block; margin: auto;" />
+
 Using Agreste data, we have access to the annual volume of salvage logging in France from 2009 to 2019. The plot below compares this volume of salvage logging with annual prevalence for the same period. 
 
-```{r plot-prevalence-against-agreste, fig.height=7, fig.width=7, fig.align='center', dpi=600}
+
+```r
 tar_read(plot_agreste_against_disturbance)
 ```
+
+<img src="plots/fig_plot-prevalence-against-agreste-1.png" style="display: block; margin: auto;" />
 
 
 To make the plots below, we computed the mortality rate of each plot (harvested trees and recruits were removed), converted it into a qualitative variable and we computed for each class the percentage of area covered by each type of disturbance. We make one plot per buffer size.  
 
-```{r plot-disturbedArea-perMortalityRate-15m, fig.height=8, fig.width=10, fig.align='center', dpi=600}
+
+```r
 cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_15m) + 
                      ggplot2::theme(legend.position = "none"), 
           tar_read(plot_disturbedArea_perMortalityRate_100m) + 
@@ -369,12 +435,16 @@ cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_15m) +
             ggplot2::theme(legend.position = "none"), 
           cowplot::get_legend(tar_read(plot_disturbedArea_perMortalityRate_200m)), 
           align = c("h", "v"), nrow = 2)
-
+#> Warning: Graphs cannot be horizontally aligned unless the axis parameter is set.
+#> Placing graphs unaligned.
 ```
+
+<img src="plots/fig_plot-disturbedArea-perMortalityRate-15m-1.png" style="display: block; margin: auto;" />
 
 In the 3 plots above, we only considered natural mortality when calculating mortality rates (harvested trees, or trees that died of unknown causes were removed from the dataset). In the three plots below, we show the same figure than above (with 200m-radius buffer), but with different approaches to calculate the mortality rates (with harvest only, unknown cause only, or all cause of death confounded)
 
-```{r plot-disturbedArea-perMortalityRate-200m-harvest, fig.height=8, fig.width=10, fig.align='center', dpi=600}
+
+```r
 cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_200m_harvest) + 
                      ggplot2::theme(legend.position = "none"), 
           tar_read(plot_disturbedArea_perMortalityRate_200m_unknown) + 
@@ -383,7 +453,11 @@ cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_200m_harvest) +
             ggplot2::theme(legend.position = "none", axis.title.x = ggplot2::element_text(size = 10)), 
           cowplot::get_legend(tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath)), 
           align = c("h", "v"), nrow = 2)
+#> Warning: Graphs cannot be horizontally aligned unless the axis parameter is set.
+#> Placing graphs unaligned.
 ```
+
+<img src="plots/fig_plot-disturbedArea-perMortalityRate-200m-harvest-1.png" style="display: block; margin: auto;" />
 
 
 
@@ -392,15 +466,21 @@ cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_200m_harvest) +
 To take into account salvage logging in the survival model, we need to compute a probability to be harvested knowing that the tree is alive, or dead. To that end, we can use the estimation by NFI agents in France of the disturbance that occurred in the plot. First, we need to compare the mortality at plot level with real mortality at tree level, computed with two different approaches (with or without mortality rate).  
 
 
-```{r plot-compare-mortality-tree-plot-level, fig.height=5, fig.width=10, fig.align='center', dpi=600}
+
+```r
 tar_read(plot_compare_mortality_tree_plot_level)
 ```
+
+<img src="plots/fig_plot-compare-mortality-tree-plot-level-1.png" style="display: block; margin: auto;" />
 
 Mortality rate at the tree level matches mortality at the plot level when it is computed with the harvest rate. From this result, we can assume that in a plot affected by a disturbance, all trees that were harvested were dead before to be harvested. In the case of undisturbed, it is not possible to know whether harvested trees experienced background mortality before, or were alive. Therefore, we need to make the assumption that trees that died from background mortality have the same probability to be harvested than alive trees. 
 
 Based on these assumptions, we modeled the harvest probability with a simple binomial glm with a logit link function as a function of the status (alive or dead due to disturbance or background mortality) and of the dbh at census 1. 
 
 
-```{r plot-harvest-probability, fig.height=8, fig.width=10, fig.align='center', dpi=600}
+
+```r
 tar_read(plot_probability_to_be_harvested)
 ```
+
+<img src="plots/fig_plot-harvest-probability-1.png" style="display: block; margin: auto;" />
