@@ -401,6 +401,6 @@ Mortality rate at the tree level matches mortality at the plot level when it is 
 Based on these assumptions, we modeled the harvest probability with a simple binomial glm with a logit link function as a function of the status (alive or dead due to disturbance or background mortality) and of the dbh at census 1. 
 
 
-```{r plot-harvest-probability, fig.height=8, fig.width=10, fig.align='center', dpi=600}
+```{r plot-harvest-probability, fig.height=6.4, fig.width=8, fig.align='center', dpi=600}
 tar_read(plot_probability_to_be_harvested)
 ```

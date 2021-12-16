@@ -325,40 +325,22 @@ plot_mortality_tree_plot <- function(NFI_tree_alive_remeasure, NFI_plot_remeasur
 #' @param NFI_tree_alive Table containing data of census 1 and 2 for trees that were alive at census 1
 plot_harvest_probability <- function(NFI_tree_alive_remeasure, NFI_plot_remeasure, 
                                      NFI_tree_alive){
-  # Format data at plot level
-  data.plot.in <- NFI_tree_alive_remeasure %>%
-    # Remove lost trees
-    filter(!(veget5 %in% c("N", "T"))) %>%
-    mutate(alive = case_when(veget5 %in% c("0") ~ 1, TRUE ~ 0), 
-           dead = case_when(veget5 %in% c("M", "A", "1", "2") ~ 1, TRUE ~ 0),
-           harvested = case_when(veget5 %in% c("6", "7") ~ 1, TRUE ~ 0)) %>%
-    group_by(idp) %>%
-    # Compute alive / death / harvest rate
-    summarise(death.rate = sum(dead, na.rm = T)/n()*100,
-              alive.rate = sum(alive, na.rm = T)/n()*100,
-              harvest.rate = sum(harvested, na.rm = T)/n()*100) %>%
-    merge(NFI_plot_remeasure, by = "idp", all.x = T, all.y = F) %>%
-    filter(!is.na(year))  # Remove unknown years
-    #filter(!(nincid5 == 0 & death.rate > 0)) # Remove undisturbed plots without death
-  
   # Format data at tree level
   data.tree.in <- NFI_tree_alive_remeasure %>%
     merge(NFI_plot_remeasure, by = "idp", all.x = T, all.y = F) %>%
     # Remove lost trees
     filter(!(veget5 %in% c("N", "T"))) %>%
-    # Remove trees in undisturbed plots with mortality
-    filter(idp %in% data.plot.in$idp) %>%
-    # Remove alive trees in disturbed plots
-    filter(!(nincid5 > 0 & veget5 == "0")) %>%
-    # Remove dead trees in undisturbed plots
-    #filter(!(nincid5 == 0 & veget5 %in% c("M", "A", "1", "2"))) %>%
+    # Remove unknown years
+    filter(!is.na(year)) %>%
+    # Remove all alive trees
+    filter(veget5 != "0") %>%
     # Remove unknown incident 
     filter(!(is.na(nincid5))) %>%
     # create status and harvest column
-    mutate(status = case_when(nincid5 == 0 ~ "alive or BM", 
-                              nincid5 == 1 ~ "dead fire", 
-                              nincid5 == 4 ~ "dead storm", 
-                              nincid5 %in% c(2, 3, 5) ~ "dead other disturbance"), 
+    mutate(status = case_when(nincid5 == 0 ~ "Undisturbed plots", 
+                              nincid5 == 1 ~ "Fire-disturbed plots", 
+                              nincid5 == 4 ~ "Storm-disturbed plots", 
+                              nincid5 %in% c(2, 3, 5) ~ "Other disturbances"), 
            harvest = case_when(veget5 %in% c("6", "7") ~ 1, 
                                veget5 %in% c("0", "M", "A", "1", "2") ~ 0), 
            idt = paste0(idp, "_", a)) %>%
@@ -376,18 +358,18 @@ plot_harvest_probability <- function(NFI_tree_alive_remeasure, NFI_plot_remeasur
                             status = unique(data.tree.in$status), 
                             incid5 = unique(data.tree.in$incid5)) %>%
     filter(!(is.na(incid5))) %>%
-    filter(!(incid5 == 0 & status != "alive or BM")) %>%
-    filter(!(incid5 > 0 & status == "alive or BM"))
-   
+    filter(!(incid5 == 0 & status != "Undisturbed plots")) %>%
+    filter(!(incid5 > 0 & status == "Undisturbed plots"))
+  
   # Add prediction and confidence interval
   model.in.linkFunction <- family(model.in)$linkinv
   
   newdata.in <- bind_cols(newdata.in, setNames(as_tibble(predict(model.in, newdata.in, se.fit = TRUE)[1:2]),
-                            c('fit_link','se_link')))
+                                               c('fit_link','se_link')))
   newdata.in <- mutate(newdata.in,
-                  fit_resp  = model.in.linkFunction(fit_link),
-                  right_upr = model.in.linkFunction(fit_link + (se_link)),
-                  right_lwr = model.in.linkFunction(fit_link - (se_link)))
+                       fit_resp  = model.in.linkFunction(fit_link),
+                       right_upr = model.in.linkFunction(fit_link + (se_link)),
+                       right_lwr = model.in.linkFunction(fit_link - (se_link)))
   
   # plot data
   newdata.in %>%
@@ -415,4 +397,6 @@ plot_harvest_probability <- function(NFI_tree_alive_remeasure, NFI_plot_remeasur
           strip.background = element_blank(), 
           strip.text = element_text(size = 12, face = "bold"))
 }
+
+
 
