@@ -487,7 +487,7 @@ Meta_data_TreeMort <- function(){
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 
-#' Format tree from to FUNDIV
+#' Format tree from TreeMort to FUNDIV
 #' @details Function to format tree data from TreeMort format to FUNDIV template
 #' @param TreeMort_tree Tree table of NFI data formatted for TreeMort
 #' @param TreeMort_plot Plot table of NFI data formatted for TreeMort

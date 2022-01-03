@@ -353,23 +353,22 @@ list(
                                                  "Buffer = 200m radius", 
                                                  death.in = "natural mortality")), 
   tar_target(plot_disturbedArea_perMortalityRate_200m_harvest, 
-           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
-                                                 "Buffer = 200m radius", 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, "", 
                                                  death.in = "harvested")), 
   tar_target(plot_disturbedArea_perMortalityRate_200m_unknown, 
-           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
-                                                 "Buffer = 200m radius", 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, "", 
                                                  death.in = "unknown cause")), 
   tar_target(plot_disturbedArea_perMortalityRate_200m_alldeath, 
-           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, 
-                                                 "Buffer = 200m radius", 
+           plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, "", 
                                                  death.in = c("natural mortality", "harvested", "unknown cause"))), 
   tar_target(plot_agreste_against_disturbance, 
              plot_agreste_disturbance(prevalence_per_country_per_year, data_agreste)), 
   tar_target(plot_compare_mortality_tree_plot_level, 
              plot_mortality_tree_plot(NFI_tree_alive_remeasure, NFI_plot_remeasure)),
   tar_target(plot_probability_to_be_harvested, 
-             plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive))
+             plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)),
+  tar_target(plot_probability_to_be_harvested2, 
+             plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive))
   
 )
 #> Establish _targets.R and _targets_r/targets/make-all-plots.R.
@@ -445,16 +444,15 @@ In the 3 plots above, we only considered natural mortality when calculating mort
 
 
 ```r
-cowplot::plot_grid(tar_read(plot_disturbedArea_perMortalityRate_200m_harvest) + 
-                     ggplot2::theme(legend.position = "none"), 
-          tar_read(plot_disturbedArea_perMortalityRate_200m_unknown) + 
-            ggplot2::theme(legend.position = "none"), 
-          tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath) + 
-            ggplot2::theme(legend.position = "none", axis.title.x = ggplot2::element_text(size = 10)), 
-          cowplot::get_legend(tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath)), 
-          align = c("h", "v"), nrow = 2)
-#> Warning: Graphs cannot be horizontally aligned unless the axis parameter is set.
-#> Placing graphs unaligned.
+cowplot::plot_grid(
+  tar_read(plot_disturbedArea_perMortalityRate_200m) + ggplot2::theme(legend.position = "none") + 
+    ggplot2::ggtitle(""), 
+  tar_read(plot_disturbedArea_perMortalityRate_200m_harvest) + ggplot2::theme(legend.position = "none"), 
+  cowplot::get_legend(tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath)), 
+  tar_read(plot_disturbedArea_perMortalityRate_200m_unknown) + ggplot2::theme(legend.position = "none"), 
+  tar_read(plot_disturbedArea_perMortalityRate_200m_alldeath) + 
+    ggplot2::theme(legend.position = "none", axis.title.x = ggplot2::element_text(size = 10)), 
+  rel_widths = c(1, 1, 0.3), nrow = 2)
 ```
 
 <img src="plots/fig_plot-disturbedArea-perMortalityRate-200m-harvest-1.png" style="display: block; margin: auto;" />
@@ -484,3 +482,11 @@ tar_read(plot_probability_to_be_harvested)
 ```
 
 <img src="plots/fig_plot-harvest-probability-1.png" style="display: block; margin: auto;" />
+
+
+
+```r
+tar_read(plot_probability_to_be_harvested2)
+```
+
+<img src="plots/fig_plot-harvest-probability-two-1.png" style="display: block; margin: auto;" />

@@ -172,11 +172,11 @@ plot_areaDisturbance_perMortalityRate <- function(FUNDIV_tree_disturbance, title
     gather(key = "Disturbance", value = "Area.percentage", "Fire", "Storm", "Other", "Undisturbed") %>%
     ggplot(aes(x = death.prop.category, y = Area.percentage, fill = Disturbance)) + 
     geom_bar(stat = "identity") + 
-    geom_text(aes(y = label.pos, label= label), vjust=-0.2, size=3.5, inherit.aes = T) + 
+    geom_text(aes(y = label.pos, label= label), vjust=-0.2, size=2.5, inherit.aes = T) + 
     scale_fill_manual(values = c("#F4A259", "#8CB369", "#5B8E7D", "#E0E1DD")) +
     xlab(paste0("Mortality rate (%) based on ", 
                 paste(death.in, collapse = " + "))) + 
-    ylab("% of the area affected") +
+    ylab("Global Disturbance Regime") +
     theme(panel.background = element_rect(color = 'black', fill = 'white'), 
           panel.grid = element_blank(),
           axis.text.y = element_text(size = 11), 
@@ -400,3 +400,84 @@ plot_harvest_probability <- function(NFI_tree_alive_remeasure, NFI_plot_remeasur
 
 
 
+
+#' Plot harvest probability
+#' @description Function to plot a modeled probability to be harvested as a function
+#'              of dbh, and of whether the tree was alive, or dead (due to different causes)
+#' @param NFI_tree_alive_remeasure Table of census 2 data at tree level, for trees that were alive at census 1
+#' @param NFI_plot_remeasure Table of census 2 data at plot level
+#' @param NFI_tree_alive Table containing data of census 1 and 2 for trees that were alive at census 1
+plot_harvest_probability2 <- function(NFI_tree_alive_remeasure, NFI_plot_remeasure, 
+                                     NFI_tree_alive){
+  # Format data at tree level
+  data.tree.in <- NFI_tree_alive_remeasure %>%
+    merge(NFI_plot_remeasure, by = "idp", all.x = T, all.y = F) %>%
+    # Remove lost trees
+    filter(!(veget5 %in% c("N", "T"))) %>%
+    # Remove unknown years
+    filter(!is.na(year)) %>%
+    # Remove all alive trees
+    filter(veget5 != "0") %>%
+    # Remove unknown incident 
+    filter(!(is.na(nincid5))) %>%
+    # create status and harvest column
+    mutate(status = case_when(nincid5 == 0 ~ "Undisturbed plots", 
+                              nincid5 == 1 ~ "Fire-disturbed plots", 
+                              nincid5 == 4 ~ "Storm-disturbed plots", 
+                              nincid5 %in% c(2, 3, 5) ~ "Other disturbances"), 
+           harvest = case_when(veget5 %in% c("6", "7") ~ 1, 
+                               veget5 %in% c("0", "M", "A", "1", "2") ~ 0), 
+           idt = paste0(idp, "_", a)) %>%
+    # add dbh at census1
+    merge((NFI_tree_alive %>% mutate(idt = paste0(idp, "_", a)) %>% dplyr::select(idt, c13)), 
+          by = "idt", all.x = T, all.y = F) %>%
+    mutate(dbh = round(c13*10/pi, digits = 0)) %>%
+    dplyr::select(idp, idt, dbh, year, status, harvest, incid5)
+  
+  # harvest model
+  model.in = glm(harvest ~ dbh*status + status*incid5, 
+                 data = data.tree.in, 
+                 family = binomial(link = "logit"))
+  newdata.in <- expand.grid(dbh = c(100:1500), 
+                            status = unique(data.tree.in$status), 
+                            incid5 = unique(data.tree.in$incid5)) %>%
+    filter(!(is.na(incid5))) %>%
+    filter(!(incid5 == 0 & status != "Undisturbed plots")) %>%
+    filter(!(incid5 > 0 & status == "Undisturbed plots")) 
+  
+  # Add prediction and confidence interval
+  model.in.linkFunction <- family(model.in)$linkinv
+  
+  newdata.in <- bind_cols(newdata.in, setNames(as_tibble(predict(model.in, newdata.in, se.fit = TRUE)[1:2]),
+                                               c('fit_link','se_link')))
+  newdata.in <- mutate(newdata.in,
+                       fit_resp  = model.in.linkFunction(fit_link),
+                       right_upr = model.in.linkFunction(fit_link + (se_link)),
+                       right_lwr = model.in.linkFunction(fit_link - (se_link)))
+  
+  # plot data
+  subset(newdata.in, status != "Undisturbed plots") %>%
+    mutate(disturbance_intensity = case_when(incid5 == 0 ~ "0%", 
+                                             incid5 == 1 ~ "1% - 25%", 
+                                             incid5 == 2 ~ "25% - 50%", 
+                                             incid5 == 3 ~ "50% - 75%", 
+                                             incid5 == 4 ~ "75% - 100%"))  %>%
+    ggplot(aes(x = dbh, y = fit_resp, group = disturbance_intensity)) + 
+    geom_line(size = 1, aes(colour = disturbance_intensity)) + 
+    geom_ribbon(aes(ymin = right_lwr, ymax = right_upr, fill = disturbance_intensity), 
+                alpha = 0.2) +
+    facet_wrap(~ status, nrow = 1) +
+    ylim(0, 1) + 
+    xlab("DBH (mm)") + ylab("Harvest probability") + 
+    scale_color_manual(values = c("#F8BB49", "#F6AA1C", "#D97212", "#BC3908", "#A82A0A")) +
+    scale_fill_manual(values = c("#F8BB49", "#F6AA1C", "#D97212", "#BC3908", "#A82A0A")) +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          axis.text = element_text(size = 11), 
+          axis.title = element_text(size = 13), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_text(size = 12), 
+          legend.key = element_rect(fill = alpha("white", 0.0)),
+          strip.background = element_blank(), 
+          strip.text = element_text(size = 12, face = "bold"))
+}
