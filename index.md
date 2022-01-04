@@ -38,7 +38,6 @@ We define some global options/functions common to all targets, and load the func
 options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
 source("R/functions_plot.R")
-source("R/FUNDIV/FUNDIV_Data.R")
 tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
                             "RColorBrewer", "lme4","data.table", "knitr",
                             "stringr", "measurements", "sf", "raster",
@@ -61,7 +60,7 @@ We start by importing the following data on:
 ```r
 list(
   tar_target(NFI_plot, read_plot(path = "data/FrenchNFI")), 
-  tar_target(NFI_plot_elevation, read.csv("data/elevation_NFIplots.csv", sep = ";")),
+  tar_target(NFI_plot_elevation, read.csv("data/FrenchNFI/elevation_NFIplots.csv", sep = ";")),
   tar_target(NFI_ecological_data, read_ecological_data(path = "data/FrenchNFI")),
   tar_target(NFI_tree_alive, read_tree(path = "data/FrenchNFI")), 
   tar_target(NFI_tree_dead, read_dead_tree(path = "data/FrenchNFI")), 
@@ -116,11 +115,6 @@ tar_target(TreeMort_species, Format_species_TreeMort(NFI_species, NFI_genus_spec
 ```
 
 
-```r
-write.table(tar_read(TreeMort_species), 
-          file = "data/TreeMort/spp_data.csv", row.names = F)
-```
-
 
 
 ## Trees data
@@ -147,12 +141,6 @@ tar_target(TreeMort_tree,
 #> Establish _targets.R and _targets_r/targets/format-trees-NFI-to-TreeMort.R.
 ```
 
-
-```r
-write.table(tar_read(TreeMort_tree), 
-          file = "data/TreeMort/tree_data.csv", row.names = F)
-```
-
 ## Plots data
 
 We format the `NFI_plot` table to fit into TreeMort template, and we write the formated table (`TreeMort_plot`) in the TreeMort directory.
@@ -166,11 +154,6 @@ list(
 #> Establish _targets.R and _targets_r/targets/format-plots-NFI-to-TreeMort.R.
 ```
 
-
-```r
-write.table(tar_read(TreeMort_plot), 
-          file = "data/TreeMort/plot_data.csv", row.names = F)
-```
 
 ## Census data
 
@@ -190,12 +173,6 @@ tar_target(TreeMort_census, Format_census_TreeMort(TreeMort_tree, NFI_census_man
 #> Establish _targets.R and _targets_r/targets/format-census-TreeMort.R.
 ```
 
-
-```r
-write.table(tar_read(TreeMort_census), 
-          file = "data/TreeMort/census_data.csv", row.names = F)
-```
-
 ## Meta data
 
 We write a metadata table in the TreeMort directory to specify important information on some columns. 
@@ -206,47 +183,69 @@ tar_target(TreeMort_metadata, Meta_data_TreeMort())
 #> Establish _targets.R and _targets_r/targets/metadata-TreeMort.R.
 ```
 
-
-```r
-write.table(tar_read(TreeMort_metadata), 
-          file = "data/TreeMort/meta_data.csv", row.names = F)
-```
-
 # Importation and formating of FUNDIV data
 
 ## Importation
 
-We start by importing the tree (`FUNDIV_tree_original`) and plot (`FUNDIV_plot`) datatables of FUNDIV. 
+We start by importing the different datatables of FUNDIV in their original format. 
 
 ```r
 list(
-  tar_target(FUNDIV_tree_original, read_FUNDIV_tree_data(data_path = "data/FUNDIV", remove_harv = TRUE)), 
-  tar_target(FUNDIV_plot, read_FUNDIV_plot_data(data_path = "data/FUNDIV"))
+  tar_target(FUNDIV_tree_original_NoFR, read.csv(file.path("data/FUNDIV", "FunDiv_trees_Nadja.csv"),
+                                                 stringsAsFactors=FALSE) %>% dplyr::filter(country != "FG")),
+  tar_target(FUNDIV_species, read.csv(file.path("data/FUNDIV", "FunDiv_species_Nadja.csv"),
+                                     stringsAsFactors=FALSE, fileEncoding = "cp1252")), 
+  tar_target(FUNDIV_plots_original_noFR, read.csv(file.path("data/FUNDIV", "FunDiv_plots_Nadja.csv"),
+                                                  stringsAsFactors=FALSE) %>% dplyr::filter(country != "FG")),
+  tar_target(FUNDIV_climate, read.csv(file.path("data/FUNDIV", "FunDiv_plots_climate_sapropos.csv"),
+                                      stringsAsFactors=FALSE)),
+  tar_target(FUNDIV_management, read.csv(file.path("data/FUNDIV", "FunDivEUROPE_plot_management.csv"),
+                                      stringsAsFactors=FALSE))
 )
 #> Establish _targets.R and _targets_r/targets/import-FUNDIV.R.
 ```
 
 ## Inclusion of French NFI remeasured data
 
-Using `FUNDIV_plot` dataset, we can format the NFI trees that were measured twice to FUNDIV template. 
+Using French NFI data formatted for TreeMort, we format the French tree data with true mortality observations to FUNDIV template. 
+
 
 ```r
-tar_target(FUNDIV_FrenchNFI_tree, 
-           Format_trees_TreeMort_to_FUNDIV(TreeMort_tree, TreeMort_plot, FUNDIV_plot))
+tar_target(FUNDIV_tree_original_FR, Format_trees_TreeMort_to_FUNDIV(TreeMort_tree, FUNDIV_species))
 #> Establish _targets.R and _targets_r/targets/format-trees-TreeMort-to-FUNDIV.R.
 ```
 
-Lastly, we can replace the French data in the original FUNDIV tree dataset by the newly formatted `FUNDIV_FrenchNFI_tree`. 
+We do the same with the french plot data: 
+
+
+```r
+tar_target(FUNDIV_plots_original_FR, 
+           Format_plots_TreeMort_to_FUNDIV(NFI_ecological_data, TreeMort_plot, FUNDIV_tree_original_FR))
+#> Establish _targets.R and _targets_r/targets/format-plots-TreeMort-to-FUNDIV.R.
+```
+
+Lastly, we can replace the datasets with and without french data for trees and plots. We also apply a small correction to the weight in the tree table
+
+
+```r
+list(
+  tar_target(FUNDIV_tree_original, 
+             correct_weight_FUNDIV(rbind(FUNDIV_tree_original_NoFR, FUNDIV_tree_original_FR))), 
+  tar_target(FUNDIV_plots_original, 
+             rbind(FUNDIV_plots_original_noFR, FUNDIV_plots_original_FR))
+)
+#> Establish _targets.R and _targets_r/targets/merge-FrenchNFI-FUNDIV.R.
+```
+
+We format the original FUNDIV data to better fit the IPM (and to include climatic variables). 
 
 
 ```r
 tar_target(FUNDIV_tree, 
-           (FUNDIV_tree_original %>% 
-             filter(country != "FR") %>% 
-             rbind(FUNDIV_FrenchNFI_tree)))
-#> Establish _targets.R and _targets_r/targets/replace-FrenchNFI-FUNDIV.R.
+           read_FUNDIV_tree_data(FUNDIV_tree_original, FUNDIV_plots_original, FUNDIV_species, 
+                              FUNDIV_climate, FUNDIV_management, remove_harv = F))
+#> Establish _targets.R and _targets_r/targets/format-IPM-FUNDIV.R.
 ```
-
 
 ## Formating to Finnish NFI template
 
@@ -255,16 +254,10 @@ The Finnish NFI template is slightly different from the French NFI template or F
 
 ```r
 tar_target(FinnishNFI_French_tree, 
-           Format_trees_FUNDIV_to_FinnishNFI(FUNDIV_FrenchNFI_tree, NFI_tree, 
+           Format_trees_FUNDIV_to_FinnishNFI(subset(FUNDIV_tree, country == "FR"), NFI_tree, 
                                               NFI_plot_elevation, NFI_plot_remeasure, 
                                               NFI_ecological_data))
 #> Establish _targets.R and _targets_r/targets/format-FUNDIV-to-FinnishNFI.R.
-```
-
-
-```r
-write.table(tar_read(FinnishNFI_French_tree), 
-          file = "data/FinnishNFI/FinnishNFI_French_tree.csv", row.names = F)
 ```
 
 We write a metadata table in the FinnishNFI directory to specify important information on some columns. 
@@ -273,12 +266,6 @@ We write a metadata table in the FinnishNFI directory to specify important infor
 ```r
 tar_target(FinnishNFI_metadata, Meta_data_FinnishNFI())
 #> Establish _targets.R and _targets_r/targets/metadata-FinnishNFI.R.
-```
-
-
-```r
-write.table(tar_read(TreeMort_metadata), 
-          file = "data/FinnishNFI/FinnishNFI_meta_data.csv", row.names = F)
 ```
 
 
@@ -329,7 +316,7 @@ tar_target(data_agreste, import_agreste("data/Agreste/agreste_total.csv"))
 ```
 
 
-# Make all plots and run pipeline
+# Make all plots, run pipeline and write tables
 
 
 ```r
@@ -380,6 +367,27 @@ tar_make()
 ```
 
 
+```r
+write.table(tar_read(TreeMort_species), 
+          file = "data/TreeMort/spp_data.csv", row.names = F)
+write.table(tar_read(TreeMort_tree), 
+          file = "data/TreeMort/tree_data.csv", row.names = F)
+write.table(tar_read(TreeMort_plot), 
+          file = "data/TreeMort/plot_data.csv", row.names = F)
+write.table(tar_read(TreeMort_census), 
+          file = "data/TreeMort/census_data.csv", row.names = F)
+write.table(tar_read(TreeMort_metadata), 
+          file = "data/TreeMort/meta_data.csv", row.names = F)
+write.table(tar_read(FUNDIV_tree_original), 
+          file = "data/FUNDIV/outputs/FUNDIV_tree_original.csv", row.names = F)
+write.table(tar_read(FUNDIV_plots_original), 
+          file = "data/FUNDIV/outputs/FUNDIV_plots_original.csv", row.names = F)
+write.table(tar_read(FinnishNFI_French_tree), 
+          file = "data/FinnishNFI/FinnishNFI_French_tree.csv", row.names = F)
+write.table(tar_read(FinnishNFI_metadata), 
+          file = "data/FinnishNFI/FinnishNFI_meta_data.csv", row.names = F)
+```
+
 # Data exploration - Disturbance data and FUNDIV
 
 We plot the percentage of the buffer around each plot covered by the three types of disturbance. 
@@ -394,14 +402,6 @@ tar_read(Map_areaCoveredPerDisturbance_FUNDIVplots)
 <img src="plots/fig_AreaCoveredPerDisturbance-1.png" style="display: block; margin: auto;" />
 
 
-When focusing on france, we can compare the area covered by each disturance to the estimations of disturbance nature and intensity made by NFI agents. 
-
-
-```r
-tar_read(plot_Compare_NFI_Senf_disturbance_area)
-```
-
-<img src="plots/fig_Compare_NFI_Senf_disturbance_area-1.png" style="display: block; margin: auto;" />
 
 In the plot below, we compute from the dataset `disturbance_per_plot_200m` the percentage of the buffer area affected by each disturbance for each year and each country, and show this temporal and spatial variability. We also added the year of first and last measurement for each country (vertical dotted black lines). 
 

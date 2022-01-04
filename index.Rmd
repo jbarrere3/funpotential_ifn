@@ -348,11 +348,6 @@ tar_read(Map_areaCoveredPerDisturbance_FUNDIVplots)
 ```
 
 
-When focusing on france, we can compare the area covered by each disturance to the estimations of disturbance nature and intensity made by NFI agents. 
-
-```{r Compare_NFI_Senf_disturbance_area, fig.height=3, fig.width=10, fig.align='center', dpi=600}
-tar_read(plot_Compare_NFI_Senf_disturbance_area)
-```
 
 In the plot below, we compute from the dataset `disturbance_per_plot_200m` the percentage of the buffer area affected by each disturbance for each year and each country, and show this temporal and spatial variability. We also added the year of first and last measurement for each country (vertical dotted black lines). 
 
