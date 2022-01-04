@@ -479,71 +479,191 @@ Meta_data_TreeMort <- function(){
 }
 
 
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-#### Section 3 - TreeMort to FUNDIV ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 3 - FUNDIV importation and formatting ####
 #'
 #' @details Group of functions used to format and merge French NFI remeasured data to FUNDIV dataset. 
 #' @author Julien Barrere
-#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 
 
 #' Format tree from TreeMort to FUNDIV
 #' @details Function to format tree data from TreeMort format to FUNDIV template
 #' @param TreeMort_tree Tree table of NFI data formatted for TreeMort
-#' @param TreeMort_plot Plot table of NFI data formatted for TreeMort
-#' @param FUNDIV_plot Plot tables already formatted to FUNDIV template
+#' @param FUNDIV_species Species table already formatted to FUNDIV template
 #' @return a tree table of French NFI remeasured data formatted for FUNDIV
-
-Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, TreeMort_plot, FUNDIV_plot){
-  # 1st step: format FNDIV_plot to merge it with TreeMort_tree table (to get climatic data)
-  FUNDIV_plot.in <- FUNDIV_plot %>%
-    filter(country == "FG") %>%
-    separate(plotcode, into = c("plot.id", "country2"), sep = "_") %>%
-    mutate(plot.id = as.integer(plot.id)) %>%
-    select(plot.id, map.wc, wai.wc, mat.wc, mat, sgdd, spring_frosts, map, 
-           wai, p_pet_yr, sws, p_pet_summer, spei_min, spei_mean)
-  
-  # 2nd step: Create FUNDIV tree from 1st census TreeMort table
-  subset(TreeMort_tree, census.n == 1) %>%
-    # Add longitude and latitude
-    merge((TreeMort_plot %>% select(plot.id, latitude, longitude)), 
-          by = "plot.id", all.x = T, all.y = F) %>%
-    rename(dbh1 = d, start_year = census.date, n_ha2 = statistical.weight) %>%
+Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, FUNDIV_species){
+  out <- subset(TreeMort_tree, census.n == 1) %>%
+    rename(dbh1 = d, height1 = height, weight1 = statistical.weight) %>%
     # Only keep trees that were alive during 1st census
     filter(tree.status == 0) %>%
     select(-tree.status, -mode.death) %>%
     # Add remeasured trees
     merge((subset(TreeMort_tree, census.n == 2) %>% select(tree.id, d, tree.status, mode.death) %>% rename(dbh2 = d)), 
           by = "tree.id", all.x = T, all.y = F) %>%
-    mutate(plotcode = as.character(plot.id), 
+    mutate(plotcode = paste0(plot.id, "_FG"), 
            sp = paste(genus, species, sep = " "), 
-           yearsbetweensurveys = as.integer(5), 
-           cluster = NA_integer_, 
-           country = "FR", 
-           ba_ha2 = NA_real_, 
-           management = 0, 
-           surveydate2 = NA_character_, 
-           BATOTcomp = NA_real_, 
            treestatus_th = case_when((dbh1 >= 100 & tree.status == 0) ~ 2, # Alive and dbh1 >10: "survivor"
                                      (dbh1 < 100 & dbh2 < 100) ~ 99, # Still lower than 10cm : To remove ?
                                      mode.death == "2" ~ 3, # Dead harvested : "Harvested"
                                      mode.death == "1s" ~ 4, # Dead standing : "dead + stem present" (natural mortality)
                                      mode.death %in% c("1f", "3") ~ 5, # Dead fallen or no information about death: "dead + stem absent"
-                                     (dbh1 < 100 & dbh2 >= 100) ~ 1)) %>% # Grew above dbh100 : "ingrowth"
+                                     (dbh1 < 100 & dbh2 >= 100) ~ 1), # Grew above dbh100 : "ingrowth"
+           height2 = NA_real_, 
+           ba1 = (pi*((dbh1/1000)/2)^2),
+           ba2 = (pi*((dbh2/1000)/2)^2),
+           dbh1_mod = NA_real_,
+           ba1_mod = NA_real_,
+           bachange_ha_yr_mod = NA_real_,
+           weight2 = NA_real_, 
+           country = "FG") %>% 
+    mutate(ba_ha1 = ba1*weight1,
+           ba_ha2 = ba2*weight1,
+           bachange_ha_yr = weight1*(ba2 - ba1)/5) %>%
+    merge((FUNDIV_species %>% mutate(sp = paste(genus, species, sep = " ")) %>% dplyr::select(sp, id)), 
+          by = "sp", all.x = T, all.y = F) %>%
+    rename(speciesid = id) %>%
     filter(treestatus_th != 99) %>%
-    merge(FUNDIV_plot.in, by = "plot.id", all.x = T, all.y = F) %>% # Add climatic variables
     # Correct inapropriate formats
-    mutate(treecode2 = tree.id,
-           plotcode = paste0(plotcode, "_FR"),
-           latitude = as.numeric(latitude), 
+    mutate(treecode = tree.id,
+           treestatus_th = as.integer(treestatus_th)) %>%
+    select(treecode, plotcode, speciesid, treestatus_th, dbh1, dbh2, height1, height2, ba1, ba_ha1, 
+           ba2, ba_ha2, bachange_ha_yr, dbh1_mod, ba1_mod, bachange_ha_yr_mod, weight1, weight2, country)
+  return(out)
+}
+
+
+#' Format plots for French data from TreeMort to FUNDIV template
+#' @details Function to format tree data from TreeMort format to FUNDIV template
+#' @param FUNDIV_tree_FR French NFI tree table formatted for FUNDIV with function Format_trees_TreeMort_to_FUNDIV
+#' @param NFI_ecological_data Table containing NFI plot ecological data
+#' @param TreeMort_plot Plot table of NFI data formatted for TreeMort
+#' @return a plot table of French NFI remeasured data formatted for FUNDIV
+Format_plots_TreeMort_to_FUNDIV <- function(NFI_ecological_data, TreeMort_plot, FUNDIV_tree_FR){
+  # Get the exact date of the first census
+  out.surveydate <- NFI_ecological_data %>%
+    mutate(plotcode = paste0(idp, "_FG"), 
+           surveydate1 = as.character(as.Date(dateeco, format = "%d/%m/%Y"))) %>%
+    dplyr::select(plotcode, surveydate1)
+  
+  # Get the coordinates
+  out.coordinates <- TreeMort_plot %>% 
+    mutate(plotcode = paste0(plot.id, "_FG")) %>%
+    dplyr::select(plotcode, latitude, longitude)
+  
+  # Format final dataset
+  out <- FUNDIV_tree_FR %>%
+    group_by(plotcode, country) %>%
+    summarise(ba_ha1 = sum(ba_ha1, na.rm = T), 
+              ba_ha2 = sum(ba_ha2, na.rm = T)) %>%
+    merge(out.surveydate, by = "plotcode", all.x = T, all.y = F) %>%
+    merge(out.coordinates, by = "plotcode", all.x = T, all.y = F) %>%
+    mutate(yearsbetweensurveys = 5, 
+           surveydate2 = as.character(as.numeric(substr(surveydate1, 1, 4)) + 5), 
+           biome = NA_real_, 
+           management = NA_real_, 
+           cluster = NA_real_) %>%
+    dplyr::select(plotcode, cluster, country, longitude, latitude, yearsbetweensurveys, surveydate1, 
+                  surveydate2, biome, ba_ha1, ba_ha2, management)
+  return(out)
+}
+
+#' Correct the weight in FUNDIV raw data
+#' @param FUNDIV_tree FUNDIV tree table
+correct_weight_FUNDIV <- function(FUNDIV_tree){
+  FUNDIV_tree %>%
+    mutate(weight1 = case_when(country == "DE" ~ weight1, 
+                               country %in% c("ES", "FG", "FI", "SW", "WA") ~ 10000/(pi*weight1^2)), 
+           weight2 = case_when(country == "DE" ~ weight2, 
+                               country %in% c("ES", "FG", "FI", "SW", "WA") ~ 10000/(pi*weight2^2))) %>% 
+    mutate_if(is.numeric, list(~na_if(., Inf)))
+}
+
+
+#' Format FUNDIV data for the IPM
+#' @author G. Kunstler (slightly modified by J. Barrere)
+#' @param FUNDIV_tree FUNDIV tree table
+#' @param FUNDIV_plots FUNDIV plot table
+#' @param FUNDIV_species FUNDIV species table
+#' @param FUNDIV_climate climate index for each FUNDIV plots
+#' @param FUNDIV_management Occurrence of harvesting in the different FUNDIV plots
+#' @param remove_harv Boolean to specify whether plots where harvesting occurred should be removed. 
+read_FUNDIV_tree_data <- function(FUNDIV_tree, FUNDIV_plots, FUNDIV_species, 
+                                  FUNDIV_climate, FUNDIV_management, remove_harv = TRUE){
+  # Add species in tree table, and correct anomalies
+  FUNDIV_tree.in <- FUNDIV_tree
+  FUNDIV_tree.in$speciesid[FUNDIV_tree.in$speciesid %in% c(46,47)] <- 48
+  FUNDIV_species.in <- FUNDIV_species
+  FUNDIV_species.in$species[FUNDIV_species.in$id ==277] <- "pubescens"
+  FUNDIV_species.in <- FUNDIV_species.in %>% mutate(sp = paste(genus, species)) %>%
+    dplyr::select(c(id, sp))
+  FUNDIV_species.in[FUNDIV_species.in$id == 277, "sp"] <- "Quercus pubescens"
+  FUNDIV_species.in[FUNDIV_species.in$id == 48, "sp"] <- "Betula"
+  data <- left_join(FUNDIV_tree.in, FUNDIV_species.in, by = c("speciesid" = "id"))
+  
+  # Add data at the plot level
+  FUNDIV_plots.in <- FUNDIV_plots %>% 
+    mutate(start_year = as.numeric(substr(surveydate1, 1, 4)), 
+           end_year = as.numeric(substr(surveydate2, 1, 4)), 
            longitude = as.numeric(longitude), 
-           treestatus_th = as.integer(treestatus_th),
-           start_year = as.integer(start_year)) %>%
-    select(plotcode, treestatus_th, dbh1, dbh2, ba_ha2, country, sp, cluster, 
-           longitude, latitude, yearsbetweensurveys, management, surveydate2, 
-           start_year, map.wc, wai.wc, mat.wc, mat, sgdd, spring_frosts, map, 
-           wai, p_pet_yr, sws, p_pet_summer, spei_min, spei_mean, n_ha2,
-           BATOTcomp, treecode2)
+           latitude = as.numeric(latitude)) %>%
+    dplyr::select(-country, -ba_ha1, -ba_ha2)
+  FUNDIV_climate.in <- FUNDIV_climate %>% 
+    filter(country != "FR") %>% # French climatic data are obsolete
+    dplyr::select(-longitude, -latitude, -country,-surveydate1, -surveydate2, -start_year, -end_year)
+  
+  # merging data
+  data <- data %>%
+    merge(FUNDIV_plots.in, by = "plotcode", all.x = T, all.y = F) %>%
+    merge(FUNDIV_climate.in, by = "plotcode", all.x = T, all.y = F) %>% 
+    group_by(plotcode) %>%
+    mutate(BATOT_ha1=sum(ba_ha1))
+  
+  # remove plot with harvesting if required
+  if (remove_harv){
+    data <- group_by(data, plotcode) %>%
+      mutate(N_harv = sum(treestatus_th == 3)) %>%
+      filter(N_harv <1)
+    # remove French plots where management has been recorded, we don't have details
+    # on individually harvested trees, the management column contains a 1 for those French
+    # plots in which management has been recorded
+    data$management[is.na(data$management)] <- 0
+    data <- filter(data, management ==0)
+    # remove plots with harvesting based on plot code
+    FUNDIV_management.in <- FUNDIV_management
+    plots_with_harv <- FUNDIV_management.in$plotcode[FUNDIV_management.in$management2 >0 & !is.na(FUNDIV_management.in$management2)]
+    data <- filter(data, ! plotcode %in% plots_with_harv)
+  }
+  
+  
+  # Compute additional variables for competition
+  data <- data %>%
+    filter(latitude >30) %>% # remove plots in the Canary Islands
+    # calculate the number per hectare from the weight
+    mutate(n_ha1 = weight1, 
+           n_ha2 = case_when(country == "FG" ~ ba_ha2/ba2, 
+                             TRUE ~ weight2)) %>% 
+    mutate(BATOTcomp = BATOT_ha1 - ba_ha1, # Compute basal area of competitors
+           country=replace(country, country=='FG', 'FR')) %>%
+    filter(!is.na(BATOT_ha1) & !is.na(surveydate2)& !is.na(surveydate1))
+  data$treecode2 <- paste0("code_", seq_len(length.out = nrow(data)))
+  
+  # remove unused variables
+  if (remove_harv){
+    data <- select(data, -c(treecode, speciesid, height1, height2, ba1,
+                            ba_ha1, ba2, bachange_ha_yr, dbh1_mod,
+                            ba1_mod, bachange_ha_yr_mod, weight1, weight2,
+                            biome, surveydate1, end_year, tile,
+                            bio1, BATOT_ha1, N_harv, n_ha1))
+  }else{
+    data <- select(data, -c(treecode, speciesid, height1, height2, ba1,
+                            ba_ha1, ba2, bachange_ha_yr, dbh1_mod,
+                            ba1_mod, bachange_ha_yr_mod, weight1, weight2,
+                            biome, surveydate1, end_year, tile,
+                            bio1, BATOT_ha1, n_ha1))
+  }
+  return(data)
 }
 
 
