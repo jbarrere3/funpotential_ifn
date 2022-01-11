@@ -481,3 +481,44 @@ plot_harvest_probability2 <- function(NFI_tree_alive_remeasure, NFI_plot_remeasu
           strip.background = element_blank(), 
           strip.text = element_text(size = 12, face = "bold"))
 }
+
+
+
+
+
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+#### Section 3 - Model outputs and diagnostic - Bayesian mortality model ####
+#%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+
+#' Plot parameters value of a rjags object
+#' @param fit.rjags.in rjags object
+#' @param title.in plot title
+plot_parameters <- function(fit.rjags.in, title.in = ""){
+  as.data.frame(fit.rjags.in$BUGSoutput$sims.matrix) %>%
+    dplyr::select(-deviance) %>%
+    gather(key = "parameter", value = "value") %>%
+    ggplot(aes(x = value)) + 
+    geom_histogram(colour = "black") + 
+    facet_wrap(~ parameter) + 
+    geom_vline(xintercept = 0, linetype = "dashed") +
+    xlab("Parameter value") +
+    theme_bw() + 
+    ggtitle(title.in)
+}
+
+
+#' Plot Markov chain convergence of a rjags object
+#' @param fit.rjags.in rjags object
+#' @param title.in plot title
+plot_convergence <- function(fit.rjags.in, title.in = ""){
+  ggs(as.mcmc(fit.rjags.in)) %>%
+    filter(Parameter != "deviance") %>%
+    mutate(Chain = as.factor(Chain)) %>%
+    ggplot(aes(x = Iteration, y = value, colour = Chain, group = Chain)) + 
+    geom_line() + 
+    facet_wrap(~ Parameter, scales = "free") + 
+    scale_color_manual(values = c("#335C67", "#E09F3E", "#9E2A2B")) +
+    theme_bw() + 
+    ggtitle(title.in) 
+}

@@ -33,6 +33,10 @@ list(
   tar_target(plot_probability_to_be_harvested, 
              plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)),
   tar_target(plot_probability_to_be_harvested2, 
-             plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive))
+             plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)), 
+  tar_target(fig_parameters_A.alba, plot_parameters(fit.mortality.FR_A.alba, "A. alba")), 
+  tar_target(fig_convergence_A.alba, plot_convergence(fit.mortality.FR_A.alba, "A. alba")), 
+  tar_target(fig_parameters_P.sylvestris, plot_parameters(fit.mortality.FR_P.sylvestris, "P. sylvestris")), 
+  tar_target(fig_convergence_P.sylvestris, plot_convergence(fit.mortality.FR_P.sylvestris, "P. sylvestris"))
   
 )

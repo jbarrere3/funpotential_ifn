@@ -18,7 +18,7 @@ We start by loading the required packages. `targets` must be version 0.5.0.9000 
 require(c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
           "data.table", "knitr", "stringr", "measurements", "sf", "raster",
           "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
-          "ggspatial", "cowplot"))
+          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc"))
 ```
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
@@ -38,11 +38,11 @@ We define some global options/functions common to all targets, and load the func
 options(tidyverse.quiet = TRUE)
 source("R/functions_data.R")
 source("R/functions_plot.R")
-tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr",
-                            "RColorBrewer", "lme4","data.table", "knitr",
-                            "stringr", "measurements", "sf", "raster",
-                            "rgdal", "exactextractr", "rgeos", "rnaturalearth",
-                            "rnaturalearthdata", "ggspatial", "cowplot"))
+source("R/functions_analysis.R")
+tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
+          "data.table", "knitr", "stringr", "measurements", "sf", "raster",
+          "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
+          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc"))
 #> Establish _targets.R and _targets_r/globals/example-globals.R.
 ```
 
@@ -316,6 +316,27 @@ tar_target(data_agreste, import_agreste("data/Agreste/agreste_total.csv"))
 ```
 
 
+# Fit of bayesian mortality model
+
+The code below fit the bayesian mortality model presented in [this document](https://www.overleaf.com/project/61d5583436dde4fa2f5cec66) in JAGS for several tree species, with the french data only
+
+
+```r
+list(
+  tar_target(fit.mortality.FR_A.alba, 
+             fit_mortality_FR(FUNDIV_tree, FUNDIV_climate, disturbance_per_plot_200m, 
+                             NFI_plot_remeasure, species.in = "Abies alba", 
+                             n.chains = 3, n.iter = 500, n.burn = 100, n.thin = 1)), 
+  tar_target(fit.mortality.FR_P.sylvestris, 
+             fit_mortality_FR(FUNDIV_tree, FUNDIV_climate, disturbance_per_plot_200m, 
+                             NFI_plot_remeasure, species.in = "Pinus sylvestris", 
+                             n.chains = 3, n.iter = 500, n.burn = 100, n.thin = 1))
+)
+
+#> Establish _targets.R and _targets_r/targets/fit-mortality-France.R.
+```
+
+
 # Make all plots, run pipeline and write tables
 
 
@@ -355,7 +376,11 @@ list(
   tar_target(plot_probability_to_be_harvested, 
              plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)),
   tar_target(plot_probability_to_be_harvested2, 
-             plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive))
+             plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)), 
+  tar_target(fig_parameters_A.alba, plot_parameters(fit.mortality.FR_A.alba, "A. alba")), 
+  tar_target(fig_convergence_A.alba, plot_convergence(fit.mortality.FR_A.alba, "A. alba")), 
+  tar_target(fig_parameters_P.sylvestris, plot_parameters(fit.mortality.FR_P.sylvestris, "P. sylvestris")), 
+  tar_target(fig_convergence_P.sylvestris, plot_convergence(fit.mortality.FR_P.sylvestris, "P. sylvestris"))
   
 )
 #> Establish _targets.R and _targets_r/targets/make-all-plots.R.
@@ -490,3 +515,44 @@ tar_read(plot_probability_to_be_harvested2)
 ```
 
 <img src="plots/fig_plot-harvest-probability-two-1.png" style="display: block; margin: auto;" />
+
+
+# Data analysis - Bayesian mortality model
+
+## Abies alba
+
+Parameters value: 
+
+```r
+tar_read(fig_parameters_A.alba)
+#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+```
+
+<img src="plots/fig_plot-parameters-Aalba-1.png" style="display: block; margin: auto;" />
+
+Convergence:
+
+```r
+tar_read(fig_convergence_A.alba)
+```
+
+<img src="plots/fig_plot-convergence-Aalba-1.png" style="display: block; margin: auto;" />
+
+## Pinus sylvestris
+
+Parameters value:
+
+```r
+tar_read(fig_parameters_P.sylvestris)
+#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+```
+
+<img src="plots/fig_plot-parameters-Psylvestris-1.png" style="display: block; margin: auto;" />
+
+Convergence:
+
+```r
+tar_read(fig_convergence_P.sylvestris)
+```
+
+<img src="plots/fig_plot-convergence-Psylvestris-1.png" style="display: block; margin: auto;" />
