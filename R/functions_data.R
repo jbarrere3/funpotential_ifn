@@ -311,7 +311,7 @@ Format_trees_census1_TreeMort <- function(NFI_tree, TreeMort_species){
            statistical.weight = w) %>%
     rename(plot.id = idp, census.date = year, height = htot, tree.status = dead) %>%
     merge(TreeMort_species, by.x = "espar", by.y = "species.id", all.x = T, all.y = F) %>%
-    select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
+    dplyr::select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
            pom, height, statistical.weight, ba, tree.status, mode.death, mode.death.other,
            canopy.position, multistem)
 }
@@ -343,7 +343,7 @@ Format_trees_census2_TreeMort <- function(NFI_tree_remeasured, TreeMort_tree_cen
            mode.death.other = NA_real_,
            canopy.position = NA_real_, 
            statistical.weight = NA_real_) %>%
-    select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
+    dplyr::select(tree.id, plot.id, census.id, census.date, census.n, species, genus, family, d, 
            pom, height, statistical.weight, ba, tree.status, mode.death, mode.death.other,
            canopy.position, multistem)
 }
@@ -385,7 +385,7 @@ Compute_NFI_stand_age <- function(NFI_tree){
               mean = mean(age, na.rm = TRUE)) %>%
     mutate(stand.age = case_when(n > 0 ~ mean, 
                                  TRUE ~ NA_real_)) %>%
-    select(idp, stand.age)
+    dplyr::select(idp, stand.age)
 }
 
 
@@ -418,7 +418,7 @@ Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data, NFI_plot_elevat
            d.threshold = 75, 
            plot.contact = "Julien BARRERE", 
            plot.contact.email = "julien.barrere@inrae.fr") %>%
-    select(plot.id, latitude, longitude, cluster, country, active, slope, 
+    dplyr::select(plot.id, latitude, longitude, cluster, country, active, slope, 
            aspect, elevation, soil.depth, soil.depth.accuracy, soil.type, 
            stand.age, change.protocol, d.threshold, plot.contact, plot.contact.email)
 }
@@ -431,12 +431,12 @@ Format_plots_TreeMort <- function(NFI_plot, NFI_ecological_data, NFI_plot_elevat
 #' @return a data.table object
 
 compute_management_census <- function(NFI_plot, NFI_plot_remeasure){
-  rbind((NFI_plot %>% select(idp, dc, year)), 
-        (NFI_plot_remeasure %>% select(idp, dc5, year) %>% rename(dc = dc5) %>% mutate(year = year + 5))) %>%
+  rbind((NFI_plot %>% dplyr::select(idp, dc, year)), 
+        (NFI_plot_remeasure %>% dplyr::select(idp, dc5, year) %>% rename(dc = dc5) %>% mutate(year = year + 5))) %>%
     mutate(management = case_when(dc == 0 ~ 0, 
                                   dc > 0 ~ 1), 
            census.id = paste(idp, year, sep = "_")) %>%
-    select(census.id, management)
+    dplyr::select(census.id, management)
 }
 
 
