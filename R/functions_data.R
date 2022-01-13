@@ -281,7 +281,7 @@ Format_species_TreeMort <- function(NFI_species, NFI_genus_species_correspondenc
                                TRUE ~ species)) %>%
     merge(NFI_genus_species_correspondence, by = "genus", all.x = T, all.y = F) %>%
     rename(species.id = code) %>%
-    select(species.id, species, genus, family) %>%
+    dplyr::select(species.id, species, genus, family) %>%
     distinct()
 } 
 
