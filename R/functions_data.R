@@ -522,10 +522,10 @@ Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, FUNDIV_species){
            ba_ha2 = ba2*weight1,
            bachange_ha_yr = weight1*(ba2 - ba1)/5) %>%
     merge((FUNDIV_species %>% mutate(sp = paste(genus, species, sep = " ")) %>% dplyr::select(sp, id)), 
-          by = "sp", all.x = T, all.y = F) %>%
+          by = "sp", all.x = T, all.y = F, allow.cartesian=TRUE) %>%
     rename(speciesid = id) %>%
     filter(treestatus_th != 99) %>%
-    # Correct inapropriate formats
+    # Correct inappropriate formats
     mutate(treecode = tree.id,
            treestatus_th = as.integer(treestatus_th)) %>%
     dplyr::select(treecode, plotcode, speciesid, treestatus_th, dbh1, dbh2, height1, height2, ba1, ba_ha1, 
