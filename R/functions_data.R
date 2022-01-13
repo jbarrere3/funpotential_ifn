@@ -455,7 +455,7 @@ Format_census_TreeMort <- function(TreeMort_tree, NFI_census_management){
            lianas = 0, 
            census.contact = "Julien BARRERE", 
            census.contact.email = "julien.barrere@inrae.fr") %>%
-    select(plot.id, census.id, census.date, census.n, plot.area, 
+    dplyr::select(plot.id, census.id, census.date, census.n, plot.area, 
            management, lianas, census.contact, census.contact.email) %>%
     distinct()
 }
@@ -498,9 +498,9 @@ Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, FUNDIV_species){
     rename(dbh1 = d, height1 = height, weight1 = statistical.weight) %>%
     # Only keep trees that were alive during 1st census
     filter(tree.status == 0) %>%
-    select(-tree.status, -mode.death) %>%
+    dplyr::select(-tree.status, -mode.death) %>%
     # Add remeasured trees
-    merge((subset(TreeMort_tree, census.n == 2) %>% select(tree.id, d, tree.status, mode.death) %>% rename(dbh2 = d)), 
+    merge((subset(TreeMort_tree, census.n == 2) %>% dplyr::select(tree.id, d, tree.status, mode.death) %>% rename(dbh2 = d)), 
           by = "tree.id", all.x = T, all.y = F) %>%
     mutate(plotcode = paste0(plot.id, "_FG"), 
            sp = paste(genus, species, sep = " "), 
@@ -528,7 +528,7 @@ Format_trees_TreeMort_to_FUNDIV <- function(TreeMort_tree, FUNDIV_species){
     # Correct inapropriate formats
     mutate(treecode = tree.id,
            treestatus_th = as.integer(treestatus_th)) %>%
-    select(treecode, plotcode, speciesid, treestatus_th, dbh1, dbh2, height1, height2, ba1, ba_ha1, 
+    dplyr::select(treecode, plotcode, speciesid, treestatus_th, dbh1, dbh2, height1, height2, ba1, ba_ha1, 
            ba2, ba_ha2, bachange_ha_yr, dbh1_mod, ba1_mod, bachange_ha_yr_mod, weight1, weight2, country)
   return(out)
 }
@@ -651,13 +651,13 @@ read_FUNDIV_tree_data <- function(FUNDIV_tree, FUNDIV_plots, FUNDIV_species,
   
   # remove unused variables
   if (remove_harv){
-    data <- select(data, -c(treecode, speciesid, height1, height2, ba1,
+    data <- dplyr::select(data, -c(treecode, speciesid, height1, height2, ba1,
                             ba_ha1, ba2, bachange_ha_yr, dbh1_mod,
                             ba1_mod, bachange_ha_yr_mod, weight1, weight2,
                             biome, surveydate1, end_year, tile,
                             bio1, BATOT_ha1, N_harv, n_ha1))
   }else{
-    data <- select(data, -c(treecode, speciesid, height1, height2, ba1,
+    data <- dplyr::select(data, -c(treecode, speciesid, height1, height2, ba1,
                             ba_ha1, ba2, bachange_ha_yr, dbh1_mod,
                             ba1_mod, bachange_ha_yr_mod, weight1, weight2,
                             biome, surveydate1, end_year, tile,
