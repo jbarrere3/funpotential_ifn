@@ -307,13 +307,6 @@ tar_target(prevalence_per_country_per_year,
 ```
 
 
-Extraction of Agreste data on annual salvage logging volume in France (national level) from 2009 to 2019. 
-
-
-```r
-tar_target(data_agreste, import_agreste("data/Agreste/agreste_total.csv"))
-#> Establish _targets.R and _targets_r/targets/get-agreste-data.R.
-```
 
 
 # Fit of bayesian mortality model
@@ -369,8 +362,6 @@ list(
   tar_target(plot_disturbedArea_perMortalityRate_200m_alldeath, 
            plot_areaDisturbance_perMortalityRate(FUNDIV_tree_disturbance200m, "", 
                                                  death.in = c("natural mortality", "harvested", "unknown cause"))), 
-  tar_target(plot_agreste_against_disturbance, 
-             plot_agreste_disturbance(prevalence_per_country_per_year, data_agreste)), 
   tar_target(plot_compare_mortality_tree_plot_level, 
              plot_mortality_tree_plot(NFI_tree_alive_remeasure, NFI_plot_remeasure)),
   tar_target(plot_probability_to_be_harvested, 
@@ -436,15 +427,6 @@ tar_read(plot_prevalence_per_country_per_year)
 ```
 
 <img src="plots/fig_plot-prevalence-per-country-per-year-1.png" style="display: block; margin: auto;" />
-
-Using Agreste data, we have access to the annual volume of salvage logging in France from 2009 to 2019. The plot below compares this volume of salvage logging with annual prevalence for the same period. 
-
-
-```r
-tar_read(plot_agreste_against_disturbance)
-```
-
-<img src="plots/fig_plot-prevalence-against-agreste-1.png" style="display: block; margin: auto;" />
 
 
 To make the plots below, we computed the mortality rate of each plot (harvested trees and recruits were removed), converted it into a qualitative variable and we computed for each class the percentage of area covered by each type of disturbance. We make one plot per buffer size.  
