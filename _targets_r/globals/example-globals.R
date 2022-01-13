@@ -1,4 +1,5 @@
 options(tidyverse.quiet = TRUE)
+options(stringsAsFactors=FALSE)
 source("R/functions_data.R")
 source("R/functions_plot.R")
 source("R/functions_analysis.R")

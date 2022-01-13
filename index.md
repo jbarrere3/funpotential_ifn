@@ -36,6 +36,7 @@ We define some global options/functions common to all targets, and load the func
 
 ```r
 options(tidyverse.quiet = TRUE)
+options(stringsAsFactors=FALSE)
 source("R/functions_data.R")
 source("R/functions_plot.R")
 source("R/functions_analysis.R")
