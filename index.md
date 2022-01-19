@@ -312,20 +312,43 @@ tar_target(prevalence_per_country_per_year,
 
 # Fit of bayesian mortality model
 
-The code below fit the bayesian mortality model presented in [this document](https://www.overleaf.com/project/61d5583436dde4fa2f5cec66) in JAGS for several tree species, with the french data only
+The code below format French NFI data to fit the bayesian mortality model presented in [this document](https://www.overleaf.com/project/61d5583436dde4fa2f5cec66) in JAGS for several tree species, with the french data only. Two options: either by fitting the occurrence of a disturbance (Dj) using Senf data, either by using true data on the occurrence of a disturbance. 
 
 
 ```r
 list(
-  tar_target(fit.mortality.FR_A.alba, 
-             fit_mortality_FR(FUNDIV_tree, FUNDIV_climate, disturbance_per_plot_200m, 
-                             NFI_plot_remeasure, species.in = "Abies alba", 
-                             n.chains = 3, n.iter = 500, n.burn = 100, n.thin = 1)), 
-  tar_target(fit.mortality.FR_P.sylvestris, 
-             fit_mortality_FR(FUNDIV_tree, FUNDIV_climate, disturbance_per_plot_200m, 
-                             NFI_plot_remeasure, species.in = "Pinus sylvestris", 
-                             n.chains = 3, n.iter = 500, n.burn = 100, n.thin = 1))
+  tar_target(data_jags_Aalba, 
+           format_FrenchNFI_mortality(FUNDIV_tree, FUNDIV_climate, 
+                                      disturbance_per_plot_200m, 
+                                      NFI_plot_remeasure, "Abies alba")), 
+  tar_target(data_jags_Aalba_2, 
+           format_FrenchNFI_mortality_2(FUNDIV_tree, FUNDIV_climate, 
+                                      disturbance_per_plot_200m, 
+                                      NFI_plot_remeasure, "Abies alba"))
 )
+#> Establish _targets.R and _targets_r/targets/format-data-mortality-France.R.
+```
+
+From these formatted data sets, the code below generate simulated data also adapted to the Bayesian model
+
+```r
+list(
+  tar_target(data_jags_generated, 
+           generate_data_jags(10, 1000, data_jags_Aalba)), 
+  tar_target(data_jags_generated_2, 
+           generate_data_jags_2(10, 1000, data_jags_Aalba_2))
+)
+#> Establish _targets.R and _targets_r/targets/generate-data-mortality-France.R.
+```
+
+Lastly, we can fit the mortality model with both true and simulated data. 
+
+```r
+list(
+  tar_target(jags_simulated, 
+             fit_mortality(data_jags_generated$data, n.chains = 3, n.iter = 5000, n.burn = 1000, n.thin = 1)), 
+  tar_target(jags_simulated_2, 
+             fit_mortality_2(data_jags_generated_2$data, n.chains = 3, n.iter = 5000, n.burn = 1000, n.thin = 1)))
 
 #> Establish _targets.R and _targets_r/targets/fit-mortality-France.R.
 ```
@@ -369,11 +392,10 @@ list(
              plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)),
   tar_target(plot_probability_to_be_harvested2, 
              plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)), 
-  tar_target(fig_parameters_A.alba, plot_parameters(fit.mortality.FR_A.alba, "A. alba")), 
-  tar_target(fig_convergence_A.alba, plot_convergence(fit.mortality.FR_A.alba, "A. alba")), 
-  tar_target(fig_parameters_P.sylvestris, plot_parameters(fit.mortality.FR_P.sylvestris, "P. sylvestris")), 
-  tar_target(fig_convergence_P.sylvestris, plot_convergence(fit.mortality.FR_P.sylvestris, "P. sylvestris"))
-  
+  tar_target(fig_convergence_simulated, plot_convergence(jags_simulated, "Simulated data - Dj latent")), 
+  tar_target(fig_convergence_simulated_2, plot_convergence(jags_simulated_2, "Simulated data - Dj true data")), 
+  tar_target(fig_compare_jags_simulated, plot_compare_jags_simulated(data_jags_generated, jags_simulated)), 
+  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2))
 )
 #> Establish _targets.R and _targets_r/targets/make-all-plots.R.
 ```
@@ -502,40 +524,41 @@ tar_read(plot_probability_to_be_harvested2)
 
 # Data analysis - Bayesian mortality model
 
-## Abies alba
-
-Parameters value: 
-
-```r
-tar_read(fig_parameters_A.alba)
-#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
-```
-
-<img src="plots/fig_plot-parameters-Aalba-1.png" style="display: block; margin: auto;" />
+## With Dj estimated as a latent variable
 
 Convergence:
 
 ```r
-tar_read(fig_convergence_A.alba)
+tar_read(fig_convergence_simulated)
 ```
 
-<img src="plots/fig_plot-convergence-Aalba-1.png" style="display: block; margin: auto;" />
+<img src="plots/fig_plot-convergence-simulated-1.png" style="display: block; margin: auto;" />
 
-## Pinus sylvestris
-
-Parameters value:
+Comparison of true simulated parameter value and fitted values. 
 
 ```r
-tar_read(fig_parameters_P.sylvestris)
+tar_read(fig_compare_jags_simulated)
 #> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ```
 
-<img src="plots/fig_plot-parameters-Psylvestris-1.png" style="display: block; margin: auto;" />
+<img src="plots/fig_plot-compare-parameters-simulated-1.png" style="display: block; margin: auto;" />
+
+## With true data on Dj
 
 Convergence:
 
 ```r
-tar_read(fig_convergence_P.sylvestris)
+tar_read(fig_convergence_simulated_2)
 ```
 
-<img src="plots/fig_plot-convergence-Psylvestris-1.png" style="display: block; margin: auto;" />
+<img src="plots/fig_plot-convergence-simulated-2-1.png" style="display: block; margin: auto;" />
+
+Comparison of true simulated parameter value and fitted values. 
+
+```r
+tar_read(fig_compare_jags_simulated_2)
+#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
+```
+
+<img src="plots/fig_plot-compare-parameters-simulated-2-1.png" style="display: block; margin: auto;" />
+

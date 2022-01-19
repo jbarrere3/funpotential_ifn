@@ -522,3 +522,32 @@ plot_convergence <- function(fit.rjags.in, title.in = ""){
     theme_bw() + 
     ggtitle(title.in) 
 }
+
+
+#' Function to compare the parameters true value and estimation by the bayesian model
+#' @param data_jags_generated simulated data fot the bayesian model
+#' @param jags_simulated output of the model fitted with data_jags_generated
+plot_compare_jags_simulated <- function(data_jags_generated, jags_simulated){
+  fitted.paramater.in <- as.data.frame(jags_simulated$BUGSoutput$sims.matrix) %>%
+    dplyr::select(-deviance) %>%
+    gather(key = "parameter", value = "value") %>%
+    mutate(source = "Fitted value")
+  
+  for(i in 1:length(names(data_jags_generated$parameters))){
+    true.paramater.in_i <- data.frame(
+      parameter = names(data_jags_generated$parameters)[i], 
+      value = data_jags_generated$parameters[[i]], 
+      source = "True value")
+    if(i == 1) true.paramater.in <- true.paramater.in_i
+    else true.paramater.in <- rbind(true.paramater.in, true.paramater.in_i)
+  }
+  
+  rbind(fitted.paramater.in, true.paramater.in) %>%
+    ggplot(aes(x = value)) + 
+    geom_histogram(colour = "black") + 
+    facet_grid(source ~ parameter, scales = "free") + 
+    geom_vline(xintercept = 0, linetype = "dashed") +
+    xlab("Parameter value") +
+    theme_bw()
+}
+

@@ -32,9 +32,8 @@ list(
              plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)),
   tar_target(plot_probability_to_be_harvested2, 
              plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)), 
-  tar_target(fig_parameters_A.alba, plot_parameters(fit.mortality.FR_A.alba, "A. alba")), 
-  tar_target(fig_convergence_A.alba, plot_convergence(fit.mortality.FR_A.alba, "A. alba")), 
-  tar_target(fig_parameters_P.sylvestris, plot_parameters(fit.mortality.FR_P.sylvestris, "P. sylvestris")), 
-  tar_target(fig_convergence_P.sylvestris, plot_convergence(fit.mortality.FR_P.sylvestris, "P. sylvestris"))
-  
+  tar_target(fig_convergence_simulated, plot_convergence(jags_simulated, "Simulated data - Dj latent")), 
+  tar_target(fig_convergence_simulated_2, plot_convergence(jags_simulated_2, "Simulated data - Dj true data")), 
+  tar_target(fig_compare_jags_simulated, plot_compare_jags_simulated(data_jags_generated, jags_simulated)), 
+  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2))
 )
