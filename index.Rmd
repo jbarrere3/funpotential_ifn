@@ -355,24 +355,29 @@ tar_make()
 ```
 
 ```{r}
+# Create output directories
+if(!dir.exists("output")) dir.create("output")
+if(!dir.exists("output/TreeMort")) dir.create("output/TreeMort")
+if(!dir.exists("output/FUNDIV")) dir.create("output/FUNDIV")
+if(!dir.exists("output/FinnishNFI")) dir.create("output/FinnishNFI")
 write.table(tar_read(TreeMort_species), 
-          file = "data/TreeMort/spp_data.csv", row.names = F)
+          file = "output/TreeMort/spp_data.csv", row.names = F)
 write.table(tar_read(TreeMort_tree), 
-          file = "data/TreeMort/tree_data.csv", row.names = F)
+          file = "output/TreeMort/tree_data.csv", row.names = F)
 write.table(tar_read(TreeMort_plot), 
-          file = "data/TreeMort/plot_data.csv", row.names = F)
+          file = "output/TreeMort/plot_data.csv", row.names = F)
 write.table(tar_read(TreeMort_census), 
-          file = "data/TreeMort/census_data.csv", row.names = F)
+          file = "output/TreeMort/census_data.csv", row.names = F)
 write.table(tar_read(TreeMort_metadata), 
-          file = "data/TreeMort/meta_data.csv", row.names = F)
+          file = "output/TreeMort/meta_data.csv", row.names = F)
 write.table(tar_read(FUNDIV_tree_original), 
-          file = "data/FUNDIV/outputs/FUNDIV_tree_original.csv", row.names = F)
+          file = "output/FUNDIV/FUNDIV_tree_original.csv", row.names = F)
 write.table(tar_read(FUNDIV_plots_original), 
-          file = "data/FUNDIV/outputs/FUNDIV_plots_original.csv", row.names = F)
+          file = "output/FUNDIV/FUNDIV_plots_original.csv", row.names = F)
 write.table(tar_read(FinnishNFI_French_tree), 
-          file = "data/FinnishNFI/FinnishNFI_French_tree.csv", row.names = F)
+          file = "output/FinnishNFI/FinnishNFI_French_tree.csv", row.names = F)
 write.table(tar_read(FinnishNFI_metadata), 
-          file = "data/FinnishNFI/FinnishNFI_meta_data.csv", row.names = F)
+          file = "output/FinnishNFI/FinnishNFI_meta_data.csv", row.names = F)
 ```
 
 # Data exploration - Disturbance data and FUNDIV
