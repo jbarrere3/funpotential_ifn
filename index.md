@@ -543,7 +543,6 @@ Comparison of true simulated parameter value and fitted values.
 
 ```r
 tar_read(fig_compare_jags_simulated)
-#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ```
 
 <img src="plots/fig_plot-compare-parameters-simulated-1.png" style="display: block; margin: auto;" />
@@ -562,7 +561,6 @@ Comparison of true simulated parameter value and fitted values.
 
 ```r
 tar_read(fig_compare_jags_simulated_2)
-#> `stat_bin()` using `bins = 30`. Pick better value with `binwidth`.
 ```
 
 <img src="plots/fig_plot-compare-parameters-simulated-2-1.png" style="display: block; margin: auto;" />

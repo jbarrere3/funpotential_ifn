@@ -530,23 +530,24 @@ plot_convergence <- function(fit.rjags.in, title.in = ""){
 plot_compare_jags_simulated <- function(data_jags_generated, jags_simulated){
   fitted.paramater.in <- as.data.frame(jags_simulated$BUGSoutput$sims.matrix) %>%
     dplyr::select(-deviance) %>%
-    gather(key = "parameter", value = "value") %>%
-    mutate(source = "Fitted value")
+    gather(key = "parameter", value = "value") 
   
   for(i in 1:length(names(data_jags_generated$parameters))){
     true.paramater.in_i <- data.frame(
       parameter = names(data_jags_generated$parameters)[i], 
-      value = data_jags_generated$parameters[[i]], 
-      source = "True value")
+      value = mean(data_jags_generated$parameters[[i]]))
     if(i == 1) true.paramater.in <- true.paramater.in_i
     else true.paramater.in <- rbind(true.paramater.in, true.paramater.in_i)
   }
   
-  rbind(fitted.paramater.in, true.paramater.in) %>%
+  fitted.paramater.in %>%
     ggplot(aes(x = value)) + 
-    geom_histogram(colour = "black") + 
-    facet_grid(source ~ parameter, scales = "free") + 
+    geom_histogram(colour = "black", bins = 30) + 
+    facet_wrap(~ parameter, scales = "free") + 
     geom_vline(xintercept = 0, linetype = "dashed") +
+    geom_vline(data = true.paramater.in, 
+               aes(xintercept = value), 
+               color = "red") + 
     xlab("Parameter value") +
     theme_bw()
 }

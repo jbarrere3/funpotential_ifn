@@ -460,7 +460,7 @@ tar_read(fig_convergence_simulated)
 ```
 
 Comparison of true simulated parameter value and fitted values. 
-```{r plot-compare-parameters-simulated, fig.height=4, fig.width=12, fig.align='center', dpi=600}
+```{r plot-compare-parameters-simulated, fig.height=6, fig.width=8, fig.align='center', dpi=600}
 tar_read(fig_compare_jags_simulated)
 ```
 
@@ -472,7 +472,7 @@ tar_read(fig_convergence_simulated_2)
 ```
 
 Comparison of true simulated parameter value and fitted values. 
-```{r plot-compare-parameters-simulated-2, fig.height=4, fig.width=12, fig.align='center', dpi=600}
+```{r plot-compare-parameters-simulated-2, fig.height=6, fig.width=8, fig.align='center', dpi=600}
 tar_read(fig_compare_jags_simulated_2)
 ```
 

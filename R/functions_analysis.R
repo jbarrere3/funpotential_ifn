@@ -170,16 +170,16 @@ generate_data_jags <- function(nDataPerPlots, nPlots, ref.data.in){
   out <- list()
   # Generate prior values
   out$parameters <- list()
-  out$parameters$a0 <- rnorm(nPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$a1 <- rnorm(nPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b0 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b1 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b2 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b3 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b4 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$c0 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$c1 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$c2 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
+  out$parameters$a0 <- array(runif(1, -5, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$a1 <- array(runif(1, 2, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$b0 <- array(runif(1, -5, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$b1 <- array(runif(1, -5, 0), dim = nPlots*nDataPerPlots)
+  out$parameters$b2 <- array(runif(1, 2, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$b3 <- array(runif(1, -5, 0), dim = nPlots*nDataPerPlots)
+  out$parameters$b4 <- array(runif(1, 0, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$c0 <- array(runif(1, -5, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$c1 <- array(runif(1, 2, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$c2 <- array(runif(1, -5, 5), dim = nPlots*nDataPerPlots)
   
   fitbeta <-  function(x, n){
     x.in <- x; x.in[which(x == 1)] = 0.99; x.in[which(x == 0)] = 0.01
@@ -317,15 +317,15 @@ fit_mortality <- function(data_jags.in, n.chains, n.iter, n.burn, n.thin){
   
   # Priors
   a0 ~ dnorm(0, 0.01)
-  a1 ~ dnorm(0, 0.01)
+  a1 ~ dnorm(1.5, 0.01)
   b0 ~ dnorm(0, 0.01)
-  b1 ~ dnorm(0, 0.01)
-  b2 ~ dnorm(0, 0.01)
-  b3 ~ dnorm(0, 0.01)
-  b4 ~ dnorm(0, 0.01)
+  b1 ~ dnorm(-1.5, 0.01)
+  b2 ~ dnorm(3, 0.01)
+  b3 ~ dnorm(-1.5, 0.01)
+  b4 ~ dnorm(1.5, 0.01)
   c0 ~ dnorm(0, 0.01)
-  c1 ~ dnorm(0, 0.01)
-  c2 ~ dnorm(0, 0.01)
+  c1 ~ dnorm(3, 0.01)
+  c2 ~ dnorm(-1.5, 0.01)
   
 
   }"
@@ -334,16 +334,16 @@ fit_mortality <- function(data_jags.in, n.chains, n.iter, n.burn, n.thin){
   
   # Function to initialize priors
   initjags <- function(){
-    return(list(a0 = runif(1, -10, 10),
-                a1 = runif(1, -10, 10),
-                b0 = runif(1, -10, 10),
-                b1 = runif(1, -10, 10),
-                b2 = runif(1, -10, 10),
-                b3 = runif(1, -10, 10),
-                b4 = runif(1, -10, 10),
-                c0 = runif(1, -10, 10),
-                c1 = runif(1, -10, 10),
-                c2 = runif(1, -10, 10)))
+    return(list(a0 = runif(1, -5, 5),
+                a1 = runif(1, 0, 5),
+                b0 = runif(1, -5, 5),
+                b1 = runif(1, -5, 0),
+                b2 = runif(1, 2, 5),
+                b3 = runif(1, -5, 0),
+                b4 = runif(1, 0, 5),
+                c0 = runif(1, -5, 5),
+                c1 = runif(1, 2, 5),
+                c2 = runif(1, -5, 0)))
   }
   
   # Run model
@@ -523,14 +523,14 @@ generate_data_jags_2 <- function(nDataPerPlots, nPlots, ref.data.in){
   out <- list()
   # Generate prior values
   out$parameters <- list()
-  out$parameters$b0 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b1 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b2 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b3 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$b4 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$c0 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$c1 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
-  out$parameters$c2 <- rnorm(nPlots*nDataPerPlots, mean = runif(1, -5, 5), sd = 0.1)
+  out$parameters$b0 <- array(runif(1, -5, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$b1 <- array(runif(1, -5, 0), dim = nPlots*nDataPerPlots)
+  out$parameters$b2 <- array(runif(1, 2, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$b3 <- array(runif(1, -5, 0), dim = nPlots*nDataPerPlots)
+  out$parameters$b4 <- array(runif(1, 0, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$c0 <- array(runif(1, -5, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$c1 <- array(runif(1, 2, 5), dim = nPlots*nDataPerPlots)
+  out$parameters$c2 <- array(runif(1, -5, 5), dim = nPlots*nDataPerPlots)
   
   fitbeta <-  function(x, n){
     x.in <- x; x.in[which(x == 1)] = 0.99; x.in[which(x == 0)] = 0.01
@@ -662,13 +662,13 @@ fit_mortality_2 <- function(data_jags.in, n.chains, n.iter, n.burn, n.thin){
   
   # Priors
   b0 ~ dnorm(0, 0.01)
-  b1 ~ dnorm(0, 0.01)
-  b2 ~ dnorm(0, 0.01)
-  b3 ~ dnorm(0, 0.01)
-  b4 ~ dnorm(0, 0.01)
+  b1 ~ dnorm(-1.5, 0.01)
+  b2 ~ dnorm(3, 0.01)
+  b3 ~ dnorm(-1.5, 0.01)
+  b4 ~ dnorm(1.5, 0.01)
   c0 ~ dnorm(0, 0.01)
-  c1 ~ dnorm(0, 0.01)
-  c2 ~ dnorm(0, 0.01)
+  c1 ~ dnorm(3, 0.01)
+  c2 ~ dnorm(-1.5, 0.01)
   
 
   }"
@@ -677,14 +677,14 @@ fit_mortality_2 <- function(data_jags.in, n.chains, n.iter, n.burn, n.thin){
   
   # Function to initialize priors
   initjags <- function(){
-    return(list(b0 = runif(1, -10, 10),
-                b1 = runif(1, -10, 10),
-                b2 = runif(1, -10, 10),
-                b3 = runif(1, -10, 10),
-                b4 = runif(1, -10, 10),
-                c0 = runif(1, -10, 10),
-                c1 = runif(1, -10, 10),
-                c2 = runif(1, -10, 10)))
+    return(list(b0 = runif(1, -5, 5),
+                b1 = runif(1, -5, 0),
+                b2 = runif(1, 2, 5),
+                b3 = runif(1, -5, 0),
+                b4 = runif(1, 0, 5),
+                c0 = runif(1, -5, 5),
+                c1 = runif(1, 2, 5),
+                c2 = runif(1, -5, 0)))
   }
   
   # Run model
