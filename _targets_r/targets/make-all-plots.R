@@ -32,6 +32,8 @@ list(
              plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)),
   tar_target(plot_probability_to_be_harvested2, 
              plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)), 
+  tar_target(fig_status_disturbance, 
+             plot_status_disturbance(NFI_tree, NFI_tree_remeasured, NFI_plot_remeasure, NFI_species)),
   tar_target(fig_convergence_simulated, plot_convergence(jags_simulated, "Simulated data - Dj latent")), 
   tar_target(fig_convergence_simulated_2, plot_convergence(jags_simulated_2, "Simulated data - Dj true data")), 
   tar_target(fig_compare_jags_simulated, plot_compare_jags_simulated(data_jags_generated, jags_simulated)), 

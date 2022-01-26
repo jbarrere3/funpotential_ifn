@@ -263,6 +263,94 @@ plot_agreste_disturbance <- function(annual_prevalence.in, data_agreste.in){
 }
 
 
+#' Plot detailed status against disturbance at the plot level with French NFI
+#' @param NFI_tree French NFI tree table of the first census
+#' @param NFI_tree_remeasured French NFI tree table of the second census
+#' @param NFI_plot_remeasure French NFI plot table of the second census (with distubrance data)
+#' @param NFI_species French NFI species table
+
+plot_status_disturbance <- function(NFI_tree, NFI_tree_remeasured, 
+                                    NFI_plot_remeasure, NFI_species){
+  NFI_tree %>%
+    # Remove trees dead in the 1st census
+    filter(veget == "0") %>%
+    # Add species
+    left_join((NFI_species %>% dplyr::select(code, Latin_name) %>% rename(espar = code)), 
+              by = "espar") %>%
+    # Get dbh and tree id
+    mutate(dbh1 = c13/pi, 
+           idt = paste(idp, a, sep = "_"), 
+           year2 = year + 5) %>%
+    # Remove trees that were not remeasured
+    filter(idt %in% mutate(NFI_tree_remeasured, idt = paste(idp, a, sep = "_"))$idt) %>%
+    # Add remeasured trees
+    left_join((NFI_tree_remeasured %>% 
+                 mutate(idt = paste(idp, a, sep = "_"), dbh2 = (c135/pi)*100) %>% 
+                 dplyr::select(idt, dbh2, veget5)), 
+              by = "idt") %>%
+    # Rename some columns
+    rename(year1 = year, species = Latin_name) %>%
+    # Change name of status
+    mutate(status = case_when(veget5 == "0" ~ "alive standing", 
+                              veget5 == "M" ~ "dead standing", 
+                              veget5 %in% c("A", "2") ~ "dead fallen", 
+                              veget5 == "1" ~ "alive fallen", 
+                              veget5 %in% c("6", "7") ~ "harvested", 
+                              veget5 %in% c("N", "T") ~ "not found")) %>%
+    # Add disturbance at the plot level
+    left_join((NFI_plot_remeasure %>%
+                 mutate(disturbance_severity = case_when(incid5 == 0 ~ "0%", 
+                                                         incid5 == 1 ~ "1% - 25%", 
+                                                         incid5 == 2 ~ "25% - 50%", 
+                                                         incid5 == 3 ~ "50% - 75%", 
+                                                         incid5 == 4 ~ "75% - 100%", 
+                                                         (is.na(incid5) & nincid5 == 0) ~ "0%")) %>%
+                 filter(!is.na(disturbance_severity)) %>%
+                 mutate(disturbance = case_when(nincid5 == 0 ~ "Undisturbed plots", 
+                                                nincid5 == 1 ~ "Fire-disturbed plots", 
+                                                nincid5 == 4 ~ "Storm-disturbed plots", 
+                                                nincid5 %in% c(2, 3, 5) ~ "Other disturbances", 
+                                                TRUE ~ "Undisturbed plots")) %>%
+                 filter(!(disturbance == "Undisturbed plots" & disturbance_severity != "0%"))), 
+              by = "idp") %>%
+    # Remove plots with no information on disturbance
+    filter(!is.na(disturbance)) %>%
+    # Select columns of interest
+    dplyr::select(idp, disturbance, disturbance_severity, species, dbh1, dbh2, year1, year2, status) %>%
+    # Arrange by plot
+    arrange(idp) %>%
+    # Format before plotting the data
+    mutate(ba = (pi*(dbh1/2)^2)) %>%
+    group_by(disturbance, disturbance_severity, status) %>%
+    summarise(sum_ba = sum(ba), 
+              n = n()) %>%
+    group_by(disturbance, disturbance_severity) %>%
+    mutate(tot_ba = sum(sum_ba), 
+           label = paste0("n = ", sum(n))) %>%
+    ungroup() %>%
+    mutate(prop_ba = sum_ba/tot_ba*100) %>%
+    # Plot the data
+    ggplot(aes(x = disturbance_severity, y = prop_ba, fill = status)) + 
+    geom_bar(stat = "identity") + 
+    geom_text(aes(y = 105, label= label), vjust=-0.2, size=3.5, inherit.aes = T) + 
+    facet_wrap(~ disturbance) +
+    ylim(0, 110) +
+    scale_fill_manual(values = c("#6A994E", "#A7C957", "#BA6F4D", "#BC4749", "#407BA7", "#8D99AE")) +
+    ylab("Percentage of basal area") + 
+    xlab("Disturbance severity") +
+    theme(panel.background = element_rect(color = 'black', fill = 'white'), 
+          panel.grid = element_blank(),
+          strip.background = element_blank(), 
+          strip.text = element_text(size = 13),
+          axis.text.y = element_text(size = 11), 
+          axis.text.x = element_text(size = 10, angle = 30, vjust = 1, hjust = 1), 
+          axis.title = element_text(size = 13), 
+          legend.text = element_text(size = 12), 
+          legend.title = element_blank())
+  
+}
+
+
 
 #%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 #### Section 2 - Data Analysis - FUNDIV / Disturbances ####

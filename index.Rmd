@@ -301,7 +301,7 @@ list(
   tar_target(jags_simulated, 
              fit_mortality(data_jags_generated$data, n.chains = 3, n.iter = 5000, n.burn = 1000, n.thin = 1)), 
   tar_target(jags_simulated_2, 
-             fit_mortality_2(data_jags_generated_2$data, n.chains = 3, n.iter = 5000, n.burn = 1000, n.thin = 1)))
+             fit_mortality_2(data_jags_generated_2$data, n.chains = 3, n.iter = 5000, n.burn = 3000, n.thin = 1)))
 
 ```
 
@@ -343,6 +343,8 @@ list(
              plot_harvest_probability(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)),
   tar_target(plot_probability_to_be_harvested2, 
              plot_harvest_probability2(NFI_tree_alive_remeasure, NFI_plot_remeasure, NFI_tree_alive)), 
+  tar_target(fig_status_disturbance, 
+             plot_status_disturbance(NFI_tree, NFI_tree_remeasured, NFI_plot_remeasure, NFI_species)),
   tar_target(fig_convergence_simulated, plot_convergence(jags_simulated, "Simulated data - Dj latent")), 
   tar_target(fig_convergence_simulated_2, plot_convergence(jags_simulated_2, "Simulated data - Dj true data")), 
   tar_target(fig_compare_jags_simulated, plot_compare_jags_simulated(data_jags_generated, jags_simulated)), 
@@ -423,6 +425,15 @@ cowplot::plot_grid(
     ggplot2::theme(legend.position = "none", axis.title.x = ggplot2::element_text(size = 10)), 
   rel_widths = c(1, 1, 0.3), nrow = 2)
 ```
+
+
+The plot below shows how the tree status (percentage of the basal area) changes with the occurence, nature and severity of a disturbance at the plot level (based on French NFI tru estimation of disturbance). 
+
+```{r fig-status-disturbance-FrenchNFI, fig.height=5, fig.width=7, fig.align='center', dpi=600}
+tar_read(fig_status_disturbance)
+```
+
+
 
 
 
