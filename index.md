@@ -18,7 +18,7 @@ We start by loading the required packages. `targets` must be version 0.5.0.9000 
 require(c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
           "data.table", "knitr", "stringr", "measurements", "sf", "raster",
           "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
-          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc"))
+          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc", "GGally"))
 ```
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
@@ -43,7 +43,7 @@ source("R/functions_analysis.R")
 tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
           "data.table", "knitr", "stringr", "measurements", "sf", "raster",
           "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
-          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc"))
+          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc", "GGally"))
 #> Establish _targets.R and _targets_r/globals/example-globals.R.
 ```
 
@@ -397,7 +397,9 @@ list(
   tar_target(fig_convergence_simulated, plot_convergence(jags_simulated, "Simulated data - Dj latent")), 
   tar_target(fig_convergence_simulated_2, plot_convergence(jags_simulated_2, "Simulated data - Dj true data")), 
   tar_target(fig_compare_jags_simulated, plot_compare_jags_simulated(data_jags_generated, jags_simulated)), 
-  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2))
+  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2)), 
+  tar_target(fig_corr_param, plot_corr_param(jags_simulated)), 
+  tar_target(fig_corr_param2, plot_corr_param(jags_simulated_2))
 )
 #> Establish _targets.R and _targets_r/targets/make-all-plots.R.
 ```
@@ -561,6 +563,17 @@ tar_read(fig_compare_jags_simulated)
 
 <img src="plots/fig_plot-compare-parameters-simulated-1.png" style="display: block; margin: auto;" />
 
+Correlation between the parameters: 
+
+```r
+tar_read(fig_corr_param)
+#> Registered S3 method overwritten by 'GGally':
+#>   method from   
+#>   +.gg   ggplot2
+```
+
+<img src="plots/fig_plot-correlation-parameters-simulated-1.png" style="display: block; margin: auto;" />
+
 ## With true data on Dj
 
 Convergence:
@@ -579,3 +592,10 @@ tar_read(fig_compare_jags_simulated_2)
 
 <img src="plots/fig_plot-compare-parameters-simulated-2-1.png" style="display: block; margin: auto;" />
 
+Correlation between the parameters: 
+
+```r
+tar_read(fig_corr_param2)
+```
+
+<img src="plots/fig_plot-correlation-parameters-simulated2-1.png" style="display: block; margin: auto;" />

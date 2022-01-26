@@ -37,5 +37,7 @@ list(
   tar_target(fig_convergence_simulated, plot_convergence(jags_simulated, "Simulated data - Dj latent")), 
   tar_target(fig_convergence_simulated_2, plot_convergence(jags_simulated_2, "Simulated data - Dj true data")), 
   tar_target(fig_compare_jags_simulated, plot_compare_jags_simulated(data_jags_generated, jags_simulated)), 
-  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2))
+  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2)), 
+  tar_target(fig_corr_param, plot_corr_param(jags_simulated)), 
+  tar_target(fig_corr_param2, plot_corr_param(jags_simulated_2))
 )

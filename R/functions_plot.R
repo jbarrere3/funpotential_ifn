@@ -640,3 +640,13 @@ plot_compare_jags_simulated <- function(data_jags_generated, jags_simulated){
     theme_bw()
 }
 
+#' Plot the correlation between parameters
+#' @param fit.rjags.in rjags object (fit of the model)
+plot_corr_param <- function(fit.rjags.in){
+  ggs(as.mcmc(fit.rjags.in)) %>%
+    filter(Parameter != "deviance") %>%
+    spread(key = Parameter, value = value) %>%
+    dplyr::select(-Iteration, -Chain) %>%
+    ggpairs(aes(alpha = 0.1)) + 
+    theme_bw()
+}

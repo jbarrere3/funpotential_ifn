@@ -19,7 +19,7 @@ We start by loading the required packages. `targets` must be version 0.5.0.9000 
 require(c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
           "data.table", "knitr", "stringr", "measurements", "sf", "raster",
           "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
-          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc"))
+          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc", "GGally"))
 ```
 
 Second, we call the `targets` library. The `tar_unscript()` R function removes the `_targets_r` directory previously written by non-interactive runs of the report. It prevents the pipeline from containing superfluous targets.
@@ -42,7 +42,7 @@ source("R/functions_analysis.R")
 tar_option_set(packages = c("dplyr", "ggplot2", "targets", "tidyr", "RColorBrewer", "lme4",
           "data.table", "knitr", "stringr", "measurements", "sf", "raster",
           "rgdal", "exactextractr", "rgeos", "rnaturalearth", "rnaturalearthdata", 
-          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc"))
+          "ggspatial", "cowplot", "rjags", "coda", "R2jags", "MASS", "ggmcmc", "GGally"))
 ```
 
 
@@ -348,7 +348,9 @@ list(
   tar_target(fig_convergence_simulated, plot_convergence(jags_simulated, "Simulated data - Dj latent")), 
   tar_target(fig_convergence_simulated_2, plot_convergence(jags_simulated_2, "Simulated data - Dj true data")), 
   tar_target(fig_compare_jags_simulated, plot_compare_jags_simulated(data_jags_generated, jags_simulated)), 
-  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2))
+  tar_target(fig_compare_jags_simulated_2, plot_compare_jags_simulated(data_jags_generated_2, jags_simulated_2)), 
+  tar_target(fig_corr_param, plot_corr_param(jags_simulated)), 
+  tar_target(fig_corr_param2, plot_corr_param(jags_simulated_2))
 )
 ```
 
@@ -475,6 +477,11 @@ Comparison of true simulated parameter value and fitted values.
 tar_read(fig_compare_jags_simulated)
 ```
 
+Correlation between the parameters: 
+```{r plot-correlation-parameters-simulated, fig.height=6, fig.width=8, fig.align='center', dpi=600}
+tar_read(fig_corr_param)
+```
+
 ## With true data on Dj
 
 Convergence:
@@ -487,3 +494,7 @@ Comparison of true simulated parameter value and fitted values.
 tar_read(fig_compare_jags_simulated_2)
 ```
 
+Correlation between the parameters: 
+```{r plot-correlation-parameters-simulated2, fig.height=6, fig.width=8, fig.align='center', dpi=600}
+tar_read(fig_corr_param2)
+```
